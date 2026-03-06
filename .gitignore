@@ -1,0 +1,12 @@
+/build/
+/input_srt
+/output_srt
+/test_audio
+/test_video
+*.dylib
+*.so
+*.dll
+*.log
+*.cmake
+.DS_Store
+/third_party
