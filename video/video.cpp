@@ -243,7 +243,7 @@ static int write_ass_from_entry(AVFormatContext* ofmt, int s_out_idx, const ASSD
 
     // Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     static int read_order = 0;
-    std::string payload = "0,Default,,0,0,0,," + text;
+    std::string payload = std::to_string(read_order++) + ",0,Default,,0,0,0,," + text;
     AVPacket* pkt = av_packet_alloc();
     if (!pkt) return AVERROR(ENOMEM);
 
@@ -336,10 +336,13 @@ int mux_video_with_ass_api(const char* video_path, pipeline_buffer& buffer, cons
     int width = 1920, height = 1080;
     
     std::vector<int> vmap;
-    int s_out_idx = -1;
+    int subtitle_idx = -1;
+    int entries_idx = 0;
 
     int copied_av_streams = 0;
     int64_t written_av_packets = 0;
+
+    int64_t last_pts = AV_NOPTS_VALUE;
 
     // subtitles gen
     const std::vector<ASSDialog>& entries = srt_to_ass(buffer.subtitles_entries);
@@ -399,7 +402,7 @@ int mux_video_with_ass_api(const char* video_path, pipeline_buffer& buffer, cons
         // s_st->codecpar->codec_tag = MKTAG('t','x','3','g');
         subtitle_st->disposition |= AV_DISPOSITION_DEFAULT | AV_DISPOSITION_FORCED;
         av_dict_set(&subtitle_st->metadata, "language", "zho", 0);
-        s_out_idx = subtitle_st->index;
+        subtitle_idx = subtitle_st->index;
     }
 
     if (!(ofmt->oformat->flags & AVFMT_NOFILE)) {
@@ -414,28 +417,42 @@ int mux_video_with_ass_api(const char* video_path, pipeline_buffer& buffer, cons
     while ((ret = av_read_frame(vfmt, pkt)) >= 0) {
         int in_idx = pkt->stream_index;
         int out_idx = (in_idx >= 0 && in_idx < (int)vmap.size()) ? vmap[in_idx] : -1;
-        if (out_idx >= 0) {
-            AVStream* in_st = vfmt->streams[in_idx];
-            AVStream* out_st = ofmt->streams[out_idx];
-            av_packet_rescale_ts(pkt, in_st->time_base, out_st->time_base);
-            pkt->stream_index = out_idx;
-            ret = av_interleaved_write_frame(ofmt, pkt);
-            if (ret < 0) { av_packet_unref(pkt); goto end; }
-            written_av_packets++;
+        if(out_idx < 0) {
+            av_packet_unref(pkt);
+            continue;
         }
+
+        AVStream* in_st = vfmt->streams[in_idx];
+        int64_t ts = (pkt->pts != AV_NOPTS_VALUE) ? pkt->pts : pkt->dts;
+        int64_t cur_cs = (ts == AV_NOPTS_VALUE)
+            ? INT64_MIN
+            : av_rescale_q(ts, in_st->time_base, AVRational{1, 100});
+
+        while(entries_idx < entries.size() && 
+                cur_cs != INT64_MIN && entries[entries_idx].start <= cur_cs){
+            int r = write_ass_from_entry(ofmt, subtitle_idx, entries[entries_idx], last_pts);
+            if (r < 0) { ret = r; goto end; }
+            entries_idx++;
+        }
+
+        
+        AVStream* out_st = ofmt->streams[out_idx];
+        av_packet_rescale_ts(pkt, in_st->time_base, out_st->time_base);
+        pkt->stream_index = out_idx;
+        ret = av_interleaved_write_frame(ofmt, pkt);
+        if (ret < 0) { av_packet_unref(pkt); goto end; }
+        written_av_packets++;
+        
         av_packet_unref(pkt);
     }
+
+    for (int i = entries_idx; i < entries.size(); ++i) {
+        int r = write_ass_from_entry(ofmt, subtitle_idx, entries[i], last_pts);
+        if (r < 0) { ret = r; goto end; }
+    }
+    
     if (ret == AVERROR_EOF) ret = 0;
     if (ret < 0) goto end;
-
-    // todo: AV 包和字幕包按 pts 时间顺序交错写入
-    {
-        int64_t last_pts = AV_NOPTS_VALUE;
-        for (const auto& e : entries) {
-            int r = write_ass_from_entry(ofmt, s_out_idx, e, last_pts);
-            if (r < 0) { ret = r; goto end; }
-        }
-    }
 
     if (written_av_packets == 0) {
         std::cerr << "[mux] no av packet written\n";
