@@ -1,0 +1,369 @@
+:root {
+  --bg-0: #0b1020;
+  --bg-1: #111831;
+  --bg-2: #1a2342;
+  --card: rgba(22, 30, 58, 0.72);
+  --card-strong: rgba(20, 27, 50, 0.92);
+  --text: #eaf0ff;
+  --muted: #9ba8cf;
+  --line: rgba(125, 147, 214, 0.24);
+  --primary: #6f8cff;
+  --primary-2: #8d6bff;
+  --ok: #2fd38b;
+  --danger: #ff6b7a;
+  --shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  --radius: 16px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC",
+    "Segoe UI", Roboto, "Microsoft YaHei", sans-serif;
+  background:
+    radial-gradient(1000px 500px at 10% -20%, #2a3d7a 0%, transparent 55%),
+    radial-gradient(900px 420px at 120% 0%, #4d2d89 0%, transparent 50%),
+    linear-gradient(160deg, var(--bg-0), var(--bg-1) 48%, #0d1328);
+  overflow: hidden;
+}
+
+.app {
+  height: 100vh;
+  padding: 18px;
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 16px;
+  min-height: 0;
+}
+
+.card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow);
+}
+
+.panel {
+  padding: 16px;
+  overflow: auto;
+}
+
+.panel h2,
+.dropzone h2 {
+  margin: 0 0 14px;
+  font-size: 18px;
+  letter-spacing: .2px;
+}
+
+.panel label {
+  display: block;
+  margin: 12px 0 6px;
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: .2px;
+}
+
+input {
+  width: 100%;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(9, 14, 30, .72);
+  color: var(--text);
+  padding: 0 12px;
+  outline: none;
+  transition: .2s ease;
+}
+
+input::placeholder { color: #7f8cb8; }
+
+input:focus {
+  border-color: color-mix(in oklab, var(--primary) 60%, #ffffff 0%);
+  box-shadow: 0 0 0 3px rgba(111, 140, 255, .18);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 76px;
+  gap: 8px;
+}
+
+button {
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, #25305a, #202a50);
+  color: var(--text);
+  cursor: pointer;
+  transition: .18s ease;
+  font-weight: 600;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+}
+
+button:active {
+  transform: translateY(0);
+  filter: brightness(.98);
+}
+
+button.primary {
+  border: none;
+  background: linear-gradient(135deg, var(--primary), var(--primary-2));
+  box-shadow: 0 8px 20px rgba(111, 140, 255, .35);
+}
+
+.actions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.content {
+  display: grid;
+  grid-template-rows: 240px 1fr;
+  gap: 16px;
+  min-height: 0;
+}
+
+.dropzone {
+  padding: 18px;
+  border: 1px dashed rgba(126, 152, 233, 0.55);
+  background: linear-gradient(180deg, rgba(19, 27, 54, 0.78), rgba(17, 24, 47, 0.72));
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+
+.dropzone p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.dropzone.dragover {
+  border-color: var(--ok);
+  box-shadow:
+    inset 0 0 0 1px rgba(47, 211, 139, .4),
+    0 0 0 4px rgba(47, 211, 139, .12),
+    var(--shadow);
+}
+
+.path {
+  margin-top: 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(9, 14, 30, .55);
+  color: #bdd1ff;
+  word-break: break-all;
+}
+
+.log-card {
+  padding: 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.log-title {
+  color: var(--muted);
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+#log {
+  margin: 0;
+  flex: 1;
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
+  overflow-x: auto;     /* 允许左右滚动 */
+  white-space: pre;     /* 不自动换行，保留原始格式 */
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+#log::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+#log::-webkit-scrollbar-thumb {
+  border-radius: 20px;
+  background: rgba(139, 157, 220, .35);
+}
+#log::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.progress-wrap {
+  margin-top: 10px;
+}
+
+.progress-head {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.progress-track {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(9, 14, 30, .7);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.progress-bar {
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--primary), var(--primary-2));
+  transition: width .2s ease;
+}
+
+.progress-group + .progress-group {
+  margin-top: 10px;
+}
+
+/* 运行进度卡片 */
+.progress-card {
+  padding: 16px;
+  overflow: auto;
+  min-height: 0;
+}
+
+.progress-card h2 {
+  margin: 0 0 12px;
+  font-size: 18px;
+  letter-spacing: .2px;
+}
+
+/* Stepper */
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(9, 14, 30, .48);
+  overflow-x: auto;
+  margin-bottom: 10px;
+}
+
+.step {
+  position: relative;
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(24, 34, 66, .72);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .2px;
+  transition: all .2s ease;
+}
+
+/* 步骤之间的连线感 */
+.step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  right: -11px;
+  top: 50%;
+  width: 10px;
+  height: 1px;
+  background: rgba(125, 147, 214, .35);
+  transform: translateY(-50%);
+}
+
+.step.is-running {
+  color: #dfe8ff;
+  border-color: rgba(111, 140, 255, .8);
+  background: linear-gradient(135deg, rgba(111, 140, 255, .35), rgba(141, 107, 255, .25));
+  box-shadow: 0 0 0 3px rgba(111, 140, 255, .14);
+  animation: stepPulse 1.2s ease-in-out infinite;
+}
+
+.step.is-done {
+  color: #c6ffe6;
+  border-color: rgba(47, 211, 139, .6);
+  background: rgba(47, 211, 139, .18);
+}
+
+.step.is-error {
+  color: #ffd5db;
+  border-color: rgba(255, 107, 122, .7);
+  background: rgba(255, 107, 122, .16);
+}
+
+.current-step-text {
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.current-step-text #stepCurrentText {
+  color: #dfe8ff;
+  font-weight: 700;
+}
+
+/* 进度条区域微调 */
+.progress-group {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(9, 14, 30, .42);
+}
+
+.progress-group + .progress-group {
+  margin-top: 10px;
+}
+
+.progress-head {
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.progress-track {
+  height: 11px;
+}
+
+.progress-bar {
+  box-shadow: inset 0 0 10px rgba(255,255,255,.15);
+}
+
+/* 动效 */
+@keyframes stepPulse {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1px); }
+}
+
+@media (max-width: 1080px) {
+  .app {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+  .content {
+    grid-template-rows: 220px 1fr;
+  }
+}
+
+.is-hidden {
+  display: none !important;
+}

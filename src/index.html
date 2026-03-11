@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI翻译工具</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="panel card">
+      <h2>设置</h2>
+
+      <label>Whisper模型路径</label>
+      <div class="row">
+        <input id="whisperModel" placeholder="输入whisper语音模型路径（.bin）"/>
+        <button id="pickWhisper">选择</button>
+      </div>
+
+      <label>翻译模型路径</label>
+      <div class="row">
+        <input id="translationModel" placeholder="输入翻译模型路径 （.gguf）"/>
+        <button id="pickTranslation">选择</button>
+      </div>
+
+      <label>输出路径</label>
+      <div class="row">
+        <input id="outputPath" placeholder="输出目录" />
+        <button id="pickOutput">选择</button>
+      </div>
+
+      <label>线程数</label>
+      <input id="threads" type="number" min="1" value="4" />
+
+      <div class="actions">
+        <button id="run" class="primary">开始处理</button>
+      </div>
+
+    </aside>
+
+    <main class="content">
+      <section id="dropZone" class="card dropzone">
+        <h2>文件输入</h2>
+        <p>拖拽视频到这里，或点击按钮选择</p>
+        <button id="pickVideo">选择视频</button>
+        <div id="videoPath"></div>
+      </section>
+
+      <section class="card progress-card">
+        <h2>运行进度</h2>
+
+        <!-- 当前步骤：改成步骤指示器 -->
+        <div class="stepper" id="stepper">
+          <div class="step is-running" data-step="prepare">准备</div>
+          <div class="step" data-step="video">视频处理</div>
+          <div class="step" data-step="whisper">语音识别</div>
+          <div class="step" data-step="translation">AI翻译</div>
+          <div class="step" data-step="done">完成</div>
+        </div>
+        <!-- <div class="current-step-text">当前步骤：<span id="stepCurrentText">准备</span></div> -->
+        <div class="current-step-text">输出结果：<span id="resultPath">-</span></div>
+
+        <div class="progress-group">
+          <div class="progress-head">
+            <span>Whisper 识别进度</span>
+            <span id="whisperProgressText">0%</span>
+          </div>
+          <div class="progress-track">
+            <div id="whisperProgressBar" class="progress-bar"></div>
+          </div>
+        </div>
+
+        <div class="progress-group">
+          <div class="progress-head">
+            <span>Translation 翻译进度</span>
+            <span id="translationProgressText">0%</span>
+          </div>
+          <div class="progress-track">
+            <div id="translationProgressBar" class="progress-bar"></div>
+          </div>
+        </div>
+
+      </section>
+    </main>
+  </div>
+
+  <script src="./renderer.js"></script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+{
+  "name": "electron-app",
+  "version": "1.0.2",
+  "main": "src/main.js",
+  "scripts": {
+    "dev": "npm run pack:backend && electron .",
+    "pack:backend": "mkdir -p backend && cp /Users/wang/code/test/build/my_app backend/my_app && chmod +x backend/my_app",
+    "build:mac": "npm run pack:backend && electron-builder --mac --arm64 --publish=never",
+    "pack:backend:win": "mkdir -p backend && cp /Users/wang/code/test/build/my_app.exe backend/my_app.exe && chmod +x backend/my_app.exe",
+    "build:win": "npm run pack:backend:win && electron-builder --win --x64 --publish=never"
+  },
+  "build": {
+    "appId": "com.wang.myapp",
+    "productName": "MyApp",
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "backend",
+        "to": "backend"
+      }
+    ],
+    "mac": {
+      "target": [
+        "dmg"
+      ]
+    },
+    "publish": null
+  },
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.3",
+    "electron": "^40.6.1",
+    "electron-builder": "^26.8.1"
+  },
+  "dependencies": {
+    "electron-log": "^5.4.3",
+    "spdlog": "^0.13.7"
+  }
+}
