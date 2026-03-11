@@ -17,11 +17,11 @@ static int params_parse(int argc, char ** argv, ai_translation_parmas& atp){
     atp.app_name = argv[0];
     for (int i = 1; i < argc; ++i){
         std::string arg = argv[i];
-        if (arg == "--video" && i + 1 < argc) atp.video_path = argv[++i];
-        else if (arg == "--whisper-model" && i + 1 < argc) atp.whisper_model_path = argv[++i];
+        if ((arg == "--video" || arg == "-v") && i + 1 < argc) atp.video_path = argv[++i];
+        else if ((arg == "--whisper-model" || arg == "-w") && i + 1 < argc) atp.whisper_model_path = argv[++i];
         else if ((arg == "--translation-model" || arg == "-m") && i + 1 < argc) atp.translation_model_path = argv[++i];
-        else if (arg == "--threads" && i + 1 < argc) atp.thread_num = std::stoi(argv[++i]);
-        else if (arg == "--output" && i + 1 < argc) atp.output_video_path = argv[++i];
+        else if ((arg == "--threads" || arg == "-t") && i + 1 < argc) atp.thread_num = std::stoi(argv[++i]);
+        else if ((arg == "--output" || arg == "-o") && i + 1 < argc) atp.output_video_path = argv[++i];
         else if (arg == "--progress-sock" && i + 1 < argc) atp.progress_sock_path = argv[++i];
         else {
             fprintf(stderr, "error: unknown argument: %s\n", arg.c_str());
@@ -35,19 +35,29 @@ static int params_parse(int argc, char ** argv, ai_translation_parmas& atp){
     return 0;
 }
 
-void logfile_init()
-{
-    try 
-    {
-        auto logger = spdlog::basic_logger_mt("app_logger", "logs/basic-log.log");
+void logfile_init(){
+    try {
+        auto log_dir = std::filesystem::current_path() / "logs";
+        std::filesystem::create_directories(log_dir);
+
+        auto now = std::chrono::system_clock::now();
+        std::time_t t = std::chrono::system_clock::to_time_t(now);
+        std::tm tm_now{};
+        #if defined(_WIN32)
+        localtime_s(&tm_now, &t);
+        #else
+        localtime_r(&t, &tm_now);
+        #endif
+        std::ostringstream oss;
+        oss << "logs/" << std::put_time(&tm_now, "%Y-%m-%d") << ".log";
+
+        auto logger = spdlog::basic_logger_mt("app_logger", oss.str());
         logger->set_pattern("[%n][%Y-%m-%d %H:%M:%S.%e] [%l] [%t]  %v");
   		logger->set_level(spdlog::level::debug);
-  		spdlog::flush_every(std::chrono::seconds(5));
+  		logger->flush_on(spdlog::level::info);
 
         logger->info("--------------------------------");
-    }
-    catch (const spdlog::spdlog_ex &ex)
-    {
+    } catch (const spdlog::spdlog_ex &ex){
         std::cout << "Log init failed: " << ex.what() << std::endl;
     }
 }
@@ -71,7 +81,7 @@ int main(int argc, char ** argv){
 
     progress_ipc_send_stage("prepare", "running");
 
-    // 视频处理
+    // video
     progress_ipc_send_stage("video", "running");
     ret = video_strat(atp, out_params, buffer);
     if (ret != 0) {
@@ -81,7 +91,7 @@ int main(int argc, char ** argv){
     progress_ipc_send_stage("video", "running");
     logger->info("video completed");
 
-    // whisper 语音识别处理
+    // whisper
     progress_ipc_send_stage("whisper", "running");
     ret = whisper_start(atp, out_params, buffer);
     if (ret != 0) {
@@ -91,7 +101,7 @@ int main(int argc, char ** argv){
     progress_ipc_send_stage("whisper", "done");
     logger->info("whisper complete");
 
-    // translation翻译处理
+    // translation
     progress_ipc_send_stage("translation", "running");
     ret = translation_start(atp, buffer);
     if (ret != 0) {
@@ -108,8 +118,7 @@ int main(int argc, char ** argv){
     std::filesystem::path file(atp.video_path);
     std::string fileName = file.filename().stem().string();
 
-    // 默认mp4格式
-    // todo: 改为支持多种视频格式输出
+    // todo: mp4 avi
     std::string output_path = atp.output_video_path + "/" + fileName + "_subtitle.mkv";
 
     ret = mux_video_with_ass_api(atp.video_path.c_str(), buffer, output_path.c_str());
@@ -122,5 +131,6 @@ int main(int argc, char ** argv){
     logger->info("subtitle file in: {}", output_path);
     progress_ipc_send_output(output_path);
     progress_ipc_close();
+    spdlog::shutdown();
     return 0;
 }
