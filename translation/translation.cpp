@@ -4,8 +4,6 @@
 #include <atomic>
 #include <chrono>
 
-std::shared_ptr<spdlog::logger> logger_trans;
-
 static void cb_log_disable(enum ggml_log_level , const char * , void * ) { }
 
 static std::string trim_copy(std::string s) {
@@ -15,26 +13,33 @@ static std::string trim_copy(std::string s) {
     return s;
 }
 
-// todo: 多种语言翻译
-static std::string translate_to_zh(
+static std::string send_to_model(
     llama_model * model,
     llama_context * ctx,
     llama_sampler * smpl,
     const llama_vocab * vocab,
     const std::string & sentances,
+    bool is_background,
     int n_predict
 ) {
-    llama_memory_clear(llama_get_memory(ctx), true);
+    // llama_memory_clear(llama_get_memory(ctx), true);
 
-    std::string prompt =
-        "You are a subtitle translation engine.\n"
-        "Automatically detect the source language of each sentence and translate everything into Simplified Chinese.\n"
-        "Output only translated subtitle text.\n"
-        "No explanation, no extra notes, no original text.\n"
-        "If one subtitle line is long, insert natural line breaks for reading.\n"
-        "Keep meaning accurate, concise, and subtitle-friendly.\n"
-        "Input:\n" + sentances + "\n"
-        "Output:\n";
+    // todo: rag
+    std::string prompt;
+
+    if(is_background){
+        prompt = 
+            "You are a subtitle translation engine.\n"
+            "Automatically detect the source language of each sentence and translate everything into Simplified Chinese.\n"
+            "Output only translated subtitle text.\n"
+            "No explanation, no extra notes, no original text.\n"
+            "If one subtitle line is long, insert natural line breaks for reading.\n"
+            "Keep meaning accurate, concise, and subtitle-friendly.\n";
+    } else {
+        prompt = 
+            "Input:\n" + sentances + "\n"
+            "Output:\n";
+    }
 
     const int n_prompt = -llama_tokenize(vocab, prompt.c_str(), prompt.size(), nullptr, 0, true, true);
     if (n_prompt <= 0) {
@@ -57,6 +62,11 @@ static std::string translate_to_zh(
             decoder_start = llama_vocab_bos(vocab);
         }
         batch = llama_batch_get_one(&decoder_start, 1);
+    }
+
+    if(is_background || n_predict <= 0){
+        if (llama_decode(ctx, batch)) return "";
+        return "";
     }
 
     std::string out;
@@ -92,21 +102,19 @@ static std::string translate_to_zh(
  * @param buffer
  */
 int translation_start(ai_translation_parmas& atp, pipeline_buffer& buffer) {
-    logger_trans = spdlog::get("app_logger");
-
     // model path
     std::string model_path = atp.translation_model_path;
     std::vector<SubtitlesEntry> in_srt = buffer.asr_entries;
     std::vector<SubtitlesEntry>& out_srt = buffer.subtitles_entries;
-    int workers = atp.thread_num? atp.thread_num : 
-        std::max(1u, std::thread::hardware_concurrency() / 2);
+    const unsigned hw = std::max(1u, std::thread::hardware_concurrency());
+    int workers = atp.thread_num? atp.thread_num : 1;
     int n_predict = 64;
-    int ngl = 999;
+    int ngl = -1;
     bool print_log = false;
     bool show_progress = true;
 
     if (model_path.empty() || in_srt.empty()) {
-        logger_trans->error("params error");
+        std::cerr << "model path is empty" << std::endl;
         return -1;
     }
 
@@ -122,8 +130,7 @@ int translation_start(ai_translation_parmas& atp, pipeline_buffer& buffer) {
 
     llama_model * model = llama_model_load_from_file(model_path.c_str(), mparams);
     if (!model) {
-        logger_trans->error("failed to load model");
-        // std::cerr << "failed to load model\n";
+        std::cerr << "failed to load model" << std::endl;
         return -1;
     }
 
@@ -154,8 +161,8 @@ int translation_start(ai_translation_parmas& atp, pipeline_buffer& buffer) {
         pool.emplace_back([&]() {
             llama_context_params lc = llama_context_default_params();
             lc.n_ctx = 1024;
-            lc.n_batch = 256;
-            lc.n_threads = (ngl > 0 ? 1 : 4);
+            lc.n_batch = 512;
+            lc.n_threads = std::max(2u, hw / 2);
 
             llama_context * tctx = llama_init_from_model(model, lc);
             if (!tctx) return;
@@ -166,11 +173,14 @@ int translation_start(ai_translation_parmas& atp, pipeline_buffer& buffer) {
 
             const llama_vocab * tvocab = llama_model_get_vocab(model);
 
+            // video background
+            send_to_model(model, tctx, tsmpl, tvocab, "", true, n_predict);
+
             while (true) {
                 size_t i = next.fetch_add(1);
                 if (i >= entries.size()) break;
                 if (!entries[i].text.empty()) {
-                    std::string temp = translate_to_zh(model, tctx, tsmpl, tvocab, entries[i].text, n_predict);
+                    std::string temp = send_to_model(model, tctx, tsmpl, tvocab, entries[i].text, false, n_predict);
                     entries[i].text = temp;
                 }
                 done.fetch_add(1, std::memory_order_relaxed);
@@ -188,8 +198,6 @@ int translation_start(ai_translation_parmas& atp, pipeline_buffer& buffer) {
     out_srt = entries;
 
     llama_model_free(model);
-
-    logger_trans->info("translation done!");
 
     return 0;
 }

@@ -13,7 +13,6 @@ extern "C" {
 #include <libswresample/swresample.h>
 #include <libavutil/channel_layout.h>
 #include <libavutil/log.h>
-#include <ass/ass.h>
 }
 
 static std::string fferr(int errnum) {
@@ -73,6 +72,7 @@ int video_extract_audio_pcm_16k(const std::string& in_video, std::vector<float>&
     {
         AVChannelLayout dst_ch;
         av_channel_layout_default(&dst_ch, 1); // mono
+        // audio resmample
         ret = swr_alloc_set_opts2(
             &swr,
             &dst_ch, AV_SAMPLE_FMT_FLT, 16000,
@@ -130,11 +130,9 @@ end:
 
 int video_strat(ai_translation_parmas& atp, output_params& out, pipeline_buffer& buffer) {
     std::vector<float>& pcm = buffer.pcm_mono_16k;
-    auto logger = spdlog::get("app_logger");
 
     if (atp.video_path.empty()) {
-        logger->error("video path is empty");
-        // std::cerr << "video path is empty\n";
+        std::cerr << "video path is empty" << std::endl;
         return -1;
     }
 
@@ -143,14 +141,12 @@ int video_strat(ai_translation_parmas& atp, output_params& out, pipeline_buffer&
 
     int ret = video_extract_audio_pcm_16k(atp.video_path, pcm);
     if (ret < 0) {
-        logger->error("extract pcm failed");
-        // std::cerr << "extract pcm failed: " << fferr(ret) << std::endl;
+        std::cerr << "extract pcm failed: " << fferr(ret) << std::endl;
         return -1;
     }
 
     if (pcm.empty()) {
-        logger->error("extract pcm empty");
-        // std::cerr << "extract pcm empty\n";
+        std::cerr << "extract pcm empty" << std::endl;
         return -1;
     }
 
@@ -297,6 +293,13 @@ std::vector<ASSDialog> srt_to_ass(std::vector<SubtitlesEntry>& entry){
  * defalut header
  */
 static int set_default_ass_header(AVStream* s_st, int x, int y) {
+    const int base = std::max(1, std::min(x, y));
+    const int fontSize = std::clamp((int)std::lround(y * 0.06), 24, 72);
+    const int marginV  = std::clamp((int)std::lround(y * 0.03),  12, 80);
+    const int marginLR = std::clamp((int)std::lround(x * 0.015), 10, 60);
+    const int outline  = std::clamp((int)std::lround(base * 0.0025), 1, 4);
+    const int shadow   = std::clamp((int)std::lround(base * 0.0015), 0, 3);
+
     std::string hdr =
         "[Script Info]\n"
         "ScriptType: v4.00+\n"
@@ -307,7 +310,10 @@ static int set_default_ass_header(AVStream* s_st, int x, int y) {
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, "
         "Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
         "Alignment, MarginL, MarginR, MarginV, Encoding\n"
-        "Style: Default,Arial,36,&H00FFFFFF,&H000000FF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,2,0,2,20,20,20,1\n"
+        "Style: Default,Arial," + std::to_string(fontSize) +
+        ",&H00FFFFFF,&H000000FF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1," +
+        std::to_string(outline) + "," + std::to_string(shadow) + ",2," +
+        std::to_string(marginLR) + "," + std::to_string(marginLR) + "," + std::to_string(marginV) + ",1\n"
         "\n"
         "[Events]\n"
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n";

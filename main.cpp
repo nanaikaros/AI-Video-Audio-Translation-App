@@ -5,9 +5,6 @@
 #include "include/params.h"
 #include "include/progress_ipc.h"
 
-#include "include/spdlog/sinks/basic_file_sink.h"
-#include "include/spdlog/spdlog.h"
-
 #include <vector>
 #include <string>
 #include <iostream>
@@ -35,42 +32,39 @@ static int params_parse(int argc, char ** argv, ai_translation_parmas& atp){
     return 0;
 }
 
-void logfile_init(){
-    try {
-        auto log_dir = std::filesystem::current_path() / "logs";
-        std::filesystem::create_directories(log_dir);
+// void logfile_init(){
+//     try {
+//         auto log_dir = std::filesystem::current_path() / "logs";
+//         std::filesystem::create_directories(log_dir);
 
-        auto now = std::chrono::system_clock::now();
-        std::time_t t = std::chrono::system_clock::to_time_t(now);
-        std::tm tm_now{};
-        #if defined(_WIN32)
-        localtime_s(&tm_now, &t);
-        #else
-        localtime_r(&t, &tm_now);
-        #endif
-        std::ostringstream oss;
-        oss << "logs/" << std::put_time(&tm_now, "%Y-%m-%d") << ".log";
+//         auto now = std::chrono::system_clock::now();
+//         std::time_t t = std::chrono::system_clock::to_time_t(now);
+//         std::tm tm_now{};
+//         #if defined(_WIN32)
+//         localtime_s(&tm_now, &t);
+//         #else
+//         localtime_r(&t, &tm_now);
+//         #endif
+//         std::ostringstream oss;
+//         oss << "logs/" << std::put_time(&tm_now, "%Y-%m-%d") << ".log";
 
-        auto logger = spdlog::basic_logger_mt("app_logger", oss.str());
-        logger->set_pattern("[%n][%Y-%m-%d %H:%M:%S.%e] [%l] [%t]  %v");
-  		logger->set_level(spdlog::level::debug);
-  		logger->flush_on(spdlog::level::info);
+//         auto logger = spdlog::basic_logger_mt("app_logger", oss.str());
+//         logger->set_pattern("[%n][%Y-%m-%d %H:%M:%S.%e] [%l] [%t]  %v");
+//   		logger->set_level(spdlog::level::debug);
+//   		logger->flush_on(spdlog::level::info);
 
-        logger->info("--------------------------------");
-    } catch (const spdlog::spdlog_ex &ex){
-        std::cout << "Log init failed: " << ex.what() << std::endl;
-    }
-}
+//         logger->info("--------------------------------");
+//     } catch (const spdlog::spdlog_ex &ex){
+//         std::cout << "Log init failed: " << ex.what() << std::endl;
+//     }
+// }
 
 int main(int argc, char ** argv){
-    logfile_init();
-    auto logger = spdlog::get("app_logger");
-
     ai_translation_parmas atp;
     int ret = params_parse(argc, argv, atp);
     if (ret != 0) {
-        logger->error("params error");
-        std::cerr << "params error: " << ret << std::endl;
+        // logger->error("params error");
+        std::cerr << "params error" << std::endl;
         return -1;
     }
 
@@ -85,33 +79,31 @@ int main(int argc, char ** argv){
     progress_ipc_send_stage("video", "running");
     ret = video_strat(atp, out_params, buffer);
     if (ret != 0) {
-        logger->error("video_strat failed");
+        progress_ipc_send_stage("video", "error");
         return -1;
     }
-    progress_ipc_send_stage("video", "running");
-    logger->info("video completed");
+    progress_ipc_send_stage("video", "done");
 
     // whisper
     progress_ipc_send_stage("whisper", "running");
     ret = whisper_start(atp, out_params, buffer);
     if (ret != 0) {
-        logger->error("whisper_start failed");
+        progress_ipc_send_stage("whisper", "error");
         return -1;
     }
     progress_ipc_send_stage("whisper", "done");
-    logger->info("whisper complete");
 
     // translation
     progress_ipc_send_stage("translation", "running");
     ret = translation_start(atp, buffer);
     if (ret != 0) {
-        logger->error("translation_start failed");
-        return -1;
+        progress_ipc_send_stage("translation", "error");
+        return -1; 
     }
     progress_ipc_send_stage("translation", "done");
 
     if(atp.output_video_path.empty()) {
-        logger->error("output video path is empty");
+        std::cerr << "video path is empty" << std::endl;
         return -1;
     }
 
@@ -123,14 +115,12 @@ int main(int argc, char ** argv){
 
     ret = mux_video_with_ass_api(atp.video_path.c_str(), buffer, output_path.c_str());
     if (ret != 0) {
-        logger->error("mux_video_with_srt_mp4_api failed");
+        std::cerr << "ass error" << std::endl;
         return -1;
     }
 
     progress_ipc_send_stage("done", "done");
-    logger->info("subtitle file in: {}", output_path);
     progress_ipc_send_output(output_path);
     progress_ipc_close();
-    spdlog::shutdown();
     return 0;
 }

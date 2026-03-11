@@ -1,4 +1,5 @@
 /build/
+/build-win/
 /input_srt
 /output_srt
 /test_audio
