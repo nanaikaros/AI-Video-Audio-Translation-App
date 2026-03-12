@@ -11,7 +11,7 @@
   },
   "build": {
     "appId": "com.wang.myapp",
-    "productName": "MyApp",
+    "productName": "AI Translation Tool",
     "files": [
       "src/**/*",
       "package.json"
@@ -29,7 +29,6 @@
     },
     "publish": null
   },
-  "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
     "@electron/rebuild": "^4.0.3",
@@ -37,7 +36,6 @@
     "electron-builder": "^26.8.1"
   },
   "dependencies": {
-    "electron-log": "^5.4.3",
-    "spdlog": "^0.13.7"
+    "electron-log": "^5.4.3"
   }
 }

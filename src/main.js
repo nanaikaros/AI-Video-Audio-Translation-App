@@ -39,12 +39,11 @@ app.whenReady().then(() => {
   createWindow();
 });
 
-// app.on('window-all-closed', () => {
-//   if (process.platform !== 'darwin') {
-//     // log.errorHandler.stopCatching();
-//     app.quit();
-//   }
-// });
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
 
 ipcMain.on('frontend-log', (_e, payload) => {
   const level = payload?.level || 'info';
@@ -176,6 +175,7 @@ ipcMain.handle('run-cpp-pipeline', async (event, payload) => {
               emitProgress('whisper', p);
             }
             if (p >= 100) emitStage('whisper', 'done');
+            mainWindow.setProgressBar(lastWhisper / 200);
           } else if (msg.stage === 'translation') {
             if (currentStage === 'whisper') emitStage('whisper', 'done');
             emitStage('translation', 'running');
@@ -185,7 +185,9 @@ ipcMain.handle('run-cpp-pipeline', async (event, payload) => {
               emitProgress('translation', p);
             }
             if (p >= 100) emitStage('translation', 'done');
+            mainWindow.setProgressBar((lastTranslation + 100) / 200);
           } else if (msg.stage === 'done') {
+            mainWindow.setProgressBar(-1);
             gotDoneStage = true;
             emitStage('done', 'done');
           }
