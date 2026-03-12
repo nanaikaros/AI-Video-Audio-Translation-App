@@ -3,33 +3,36 @@ project(ffmpegApp)
 
 set(CMAKE_CXX_STANDARD 17)
 
-# --- 新增：静态优先开关 ---
 option(APP_PREFER_STATIC "Prefer static third-party libs" ON)
 
 if (APP_PREFER_STATIC)
-    # 对子项目（llama.cpp / whisper.cpp）优先静态
     set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 
-    # 某些版本会用这些变量，统一关掉共享库
     set(LLAMA_BUILD_SHARED_LIB OFF CACHE BOOL "" FORCE)
     set(WHISPER_BUILD_SHARED_LIB OFF CACHE BOOL "" FORCE)
 
-    # 查找库时优先 .a
     set(_OLD_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
     set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
 endif()
 
-# 设置第三方库路径
 set(THIRD_PARTY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
-set(FFMPEG_DIR ${THIRD_PARTY_DIR}/ffmpeg)
+
+if (WIN32)
+  set(FFMPEG_DIR ${THIRD_PARTY_DIR}/ffmpeg-win64)
+elseif(APPLE)
+  set(FFMPEG_DIR ${THIRD_PARTY_DIR}/ffmpeg-mac)
+endif()
 
 # 查找 FFmpeg 组件（会优先找 .a）
-find_path(FFMPEG_INCLUDE_DIR libavcodec/avcodec.h PATHS ${FFMPEG_DIR}/include)
-find_library(AVCODEC_LIBRARY avcodec PATHS ${FFMPEG_DIR}/lib)
-find_library(AVFORMAT_LIBRARY avformat PATHS ${FFMPEG_DIR}/lib)
-find_library(AVUTIL_LIBRARY avutil PATHS ${FFMPEG_DIR}/lib)
-find_library(SWSCALE_LIBRARY swscale PATHS ${FFMPEG_DIR}/lib)
-find_library(SWRESAMPLE_LIBRARY swresample PATHS ${FFMPEG_DIR}/lib)
+find_path(FFMPEG_INCLUDE_DIR libavcodec/avcodec.h
+  PATHS ${FFMPEG_DIR}/include
+  NO_DEFAULT_PATH
+)
+find_library(AVCODEC_LIBRARY avcodec PATHS ${FFMPEG_DIR}/lib NO_DEFAULT_PATH)
+find_library(AVFORMAT_LIBRARY avformat PATHS ${FFMPEG_DIR}/lib NO_DEFAULT_PATH)
+find_library(AVUTIL_LIBRARY avutil PATHS ${FFMPEG_DIR}/lib NO_DEFAULT_PATH)
+find_library(SWSCALE_LIBRARY swscale PATHS ${FFMPEG_DIR}/lib NO_DEFAULT_PATH)
+find_library(SWRESAMPLE_LIBRARY swresample PATHS ${FFMPEG_DIR}/lib NO_DEFAULT_PATH)
 
 if (APP_PREFER_STATIC)
     set(CMAKE_FIND_LIBRARY_SUFFIXES ${_OLD_CMAKE_FIND_LIBRARY_SUFFIXES})
@@ -57,6 +60,20 @@ target_include_directories(my_app PRIVATE
     ${THIRD_PARTY_DIR}/whisper.cpp/include
 )
 
+if(WIN32)
+  target_link_libraries(my_app PRIVATE
+    "-Wl,--start-group"
+    ${AVFORMAT_LIBRARY}
+    ${AVCODEC_LIBRARY}
+    ${SWRESAMPLE_LIBRARY}
+    ${SWSCALE_LIBRARY}
+    ${AVUTIL_LIBRARY}
+    "-Wl,--end-group"
+    Ws2_32
+    llama
+    whisper
+  )
+else()
 target_link_libraries(my_app
     ${AVCODEC_LIBRARY}
     ${AVFORMAT_LIBRARY}
@@ -66,10 +83,10 @@ target_link_libraries(my_app
     llama
     whisper
 )
-
-# 可选：减小体积
-if (APPLE)
-    target_link_options(my_app PRIVATE -Wl,-dead_strip)
 endif()
+
+# if (APPLE)
+#     target_link_options(my_app PRIVATE -Wl,-dead_strip)
+# endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

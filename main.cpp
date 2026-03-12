@@ -32,33 +32,6 @@ static int params_parse(int argc, char ** argv, ai_translation_parmas& atp){
     return 0;
 }
 
-// void logfile_init(){
-//     try {
-//         auto log_dir = std::filesystem::current_path() / "logs";
-//         std::filesystem::create_directories(log_dir);
-
-//         auto now = std::chrono::system_clock::now();
-//         std::time_t t = std::chrono::system_clock::to_time_t(now);
-//         std::tm tm_now{};
-//         #if defined(_WIN32)
-//         localtime_s(&tm_now, &t);
-//         #else
-//         localtime_r(&t, &tm_now);
-//         #endif
-//         std::ostringstream oss;
-//         oss << "logs/" << std::put_time(&tm_now, "%Y-%m-%d") << ".log";
-
-//         auto logger = spdlog::basic_logger_mt("app_logger", oss.str());
-//         logger->set_pattern("[%n][%Y-%m-%d %H:%M:%S.%e] [%l] [%t]  %v");
-//   		logger->set_level(spdlog::level::debug);
-//   		logger->flush_on(spdlog::level::info);
-
-//         logger->info("--------------------------------");
-//     } catch (const spdlog::spdlog_ex &ex){
-//         std::cout << "Log init failed: " << ex.what() << std::endl;
-//     }
-// }
-
 int main(int argc, char ** argv){
     ai_translation_parmas atp;
     int ret = params_parse(argc, argv, atp);

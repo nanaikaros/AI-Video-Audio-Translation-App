@@ -1,57 +1,65 @@
-* 翻译工具
+# AI 音视频 翻译
 
-** 根据视频的文字内容进行翻译
+简介
+- 负责音频识别与翻译，输出带ass字幕的mkv格式视频。
 
-** 根据音频进行翻译
+主要功能
+- 音频识别（本地模型）
+- 翻译（本地模型）
+- 支持输入 SRT、输出 SRT/ASS
+- 多线程、进度与日志
+- 提供 CLI 或可部署为后端服务的可执行文件
 
-处理架构：
-        视频
-  音频             视频
-whisper      抽帧 画面提取进行翻译
+目录建议
+- /models/   -> 存放模型文件（ggml / gguf）
+- /bin/      -> 编译生成的可执行文件或服务二进制
+- /samples/  -> 示例输入文件
+- /output/   -> 处理后字幕/视频输出
+- config.json -> 默认运行参数
 
-前端：electron
+先决条件（macOS）
+- ffmpeg：brew install ffmpeg
+- 必要的构建工具（取决于项目语言，如 gcc/clang、CMake、make、go、cargo）：请按项目 README 的构建说明安装
+- 足够的磁盘与内存用于模型加载
 
-参数：
-  音频识别模型：ggml-large-v3.bin
-  翻译模型：HY-MT1.5-1.8B-GGUF.gguf
+模型与资源放置
+- 将模型文件放入 /models/，示例：
+  - /models/ggml-large-v3.bin
+  - /models/HY-MT1.5-1.8B-GGUF.gguf
 
-  输入srt路径 
-  输出srt路径
+配置示例（config.json）
+```json
+{
+  "audioModel": "./models/ggml-large-v3.bin",
+  "translateModel": "./models/HY-MT1.5-1.8B-GGUF.gguf",
+  "inputVideo": "./samples/input.mp4",
+  "inputAudio": "./samples/input.wav",
+  "inputSrt": "",
+  "outputSrt": "./output/output.srt",
+  "outputAss": "./output/output.ass",
+  "threads": 4,
+  "targetLang": "zh-CN",
+  "silentLog": true
+}
+```
 
-  输入音频路径
+安装与运行（示例）
+1. 切换到项目目录：
+   ```bash
+   cd /test
+   ```
+2. 若项目有构建脚本，编译生成二进制（示例）：
+   ```bash
+   # 示例：根据项目实际构建命令替换
+   mkdir -p build && cd build
+   cmake .. && make -j4
+   ```
+3. 运行 CLI / 服务（示例）：
+   ```bash
+   ./build/my_app -v [video path] -w [whisper model] -m [translation model] -t [thread] -o [output video path]
+   ```
 
-  线程数量
-
-todo:
-  1. 添加线程参数 添加多线程配置 ✅
-  2. 添加静默log ✅
-  3. 翻译差一点 -> 换模型看下效果 ✅
-  4. 流水线  whisper [0.0 -> 1.0] 123 -> translation 翻译 -> 写入文档 ✅
-
-
-** 前端功能
-
-设置模块：设置参数（模型位置、 输入位置、 输出位置）
-文件输入模块：拖拽视频进入 进行分析处理
-流水线模式
-
-todo：
-  1. video参数修改 ✅
-  2. 默认参数 ✅
-  3. 视频翻译 
-  4. 进度条 ✅
-  5. 改提示词 ✅ 效果一般 🤔
-  6. 日志系统 将前端运行日志改为spdlog 布局变动 ✅
-  7. whisper文件的裁剪
-  
-  
-字幕样式换成ASS 第三方libass库 大工程！！！已完成
-todo:
-  1. 字体太小 
-  2. 视频不能加载字幕 要手动加载 现在只能输出ass ✅
-  
-微调translation模型 python
-todo：
-  针对视频背景微调模型 使得翻译更准确
-  “知识更新频繁” -> 主要靠 RAG
-  “固定翻译风格/格式” -> 用 LoRA 学习
+注意事项
+- 模型体积大且占内存，确保目标机器资源充足。
+- 使用 Intl 或后端本地化方案处理时间/数字格式；若需要多语言 UI，可由独立前端对接此后端。
+- 若翻译质量不足，尝试替换或微调翻译模型。

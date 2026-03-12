@@ -157,9 +157,7 @@ static void whisper_print_progress_callback(struct whisper_context * /*ctx*/,
         *progress_prev = progress;
         progress_ipc_send("whisper", progress);
 
-        if (progress == 100) {
-            std::cout << "whisper done" << std::endl;
-        }
+        if (progress == 100) {}
     }
 }
 
@@ -290,7 +288,7 @@ int whisper_start(ai_translation_parmas& atp, output_params& out, pipeline_buffe
     }
     if (atp.whisper_model_path.empty()) {
         fprintf(stderr, "error: whisper model path is empty\n");
-        return -2;
+        return -1;
     }
 
     whisper_params params;
@@ -314,7 +312,7 @@ int whisper_start(ai_translation_parmas& atp, output_params& out, pipeline_buffe
     whisper_context * ctx = whisper_init_from_file_with_params(params.model.c_str(), cparams);
     if (!ctx) {
         fprintf(stderr, "error: failed to initialize whisper context\n");
-        return 3;
+        return -1;
     }
 
     whisper_ctx_init_openvino_encoder(ctx, nullptr, params.openvino_encode_device.c_str(), nullptr);
@@ -351,7 +349,7 @@ int whisper_start(ai_translation_parmas& atp, output_params& out, pipeline_buffe
     int ret = whisper_full_parallel(ctx, wparams, pcmf32.data(), (int)pcmf32.size(), params.n_processors);
     if (ret != 0) {
         whisper_free(ctx);
-        return 10;
+        return -1;
     }
 
     buffer.asr_entries.clear();
