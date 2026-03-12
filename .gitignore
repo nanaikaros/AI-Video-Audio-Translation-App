@@ -11,3 +11,5 @@
 *.cmake
 .DS_Store
 /third_party
+electronapp/node_modules/
+electronapp/dist/

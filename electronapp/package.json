@@ -3,10 +3,8 @@
   "version": "1.0.2",
   "main": "src/main.js",
   "scripts": {
-    "dev": "npm run pack:backend && electron .",
-    "pack:backend": "mkdir -p backend && cp /Users/wang/code/test/build/my_app backend/my_app && chmod +x backend/my_app",
-    "build:mac": "npm run pack:backend && electron-builder --mac --arm64 --publish=never",
-    "pack:backend:win": "mkdir -p backend && cp /Users/wang/code/test/build/my_app.exe backend/my_app.exe && chmod +x backend/my_app.exe",
+    "dev": "electron .",
+    "build:mac": "electron-builder --mac --arm64 --publish=never",
     "build:win": "npm run pack:backend:win && electron-builder --win --x64 --publish=never"
   },
   "build": {
@@ -18,7 +16,7 @@
     ],
     "extraResources": [
       {
-        "from": "backend",
+        "from": "../build",
         "to": "backend"
       }
     ],
