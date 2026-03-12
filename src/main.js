@@ -39,11 +39,11 @@ app.whenReady().then(() => {
   createWindow();
 });
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
-});
+// app.on('window-all-closed', () => {
+//   if (process.platform !== 'darwin') {
+//     app.quit();
+//   }
+// });
 
 ipcMain.on('frontend-log', (_e, payload) => {
   const level = payload?.level || 'info';
@@ -233,12 +233,15 @@ ipcMain.handle('run-cpp-pipeline', async (event, payload) => {
     child.stderr.on('data', (buf) => {
       const t = buf.toString();
       event.sender.send('cpp-log', { type: 'stderr', text: t });
-      try { 
-        dialog.showMessageBox(mainWindow, {
-          type: 'info',
-          title: 'Error from backend',
-          message: t,
-        });
+      try {
+        if(t.toLowerCase().includes('could not update timestamps for skipped samples')) {}
+        else {
+          dialog.showMessageBox(mainWindow, {
+            type: 'error',
+            title: 'Error from backend',
+            message: t,
+          });
+        }
       } catch (e) {}
       log.error(`[cpp stderr] ${t.trimEnd()}`);
     });
