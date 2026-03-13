@@ -172,3 +172,23 @@ Dialogue: 0,0:00:05.09,0:00:06.61,Default,,0,0,0,,请尽情释放你的力量吧
 - Model files are large and memory-intensive; ensure enough disk and RAM.
 - If translation quality is unsatisfactory, switch/fine-tune the translation model.
 - For multilingual UI, connect a separate frontend to this backend/CLI.
+
+## Third-Party Libraries
+
+This project uses the following third-party libraries:
+
+| Library | Purpose | License | Link |
+|---|---|---|---|
+| whisper.cpp (Whisper) | Local speech-to-text (ASR) for audio/video | MIT | https://github.com/ggerganov/whisper.cpp |
+| llama.cpp (Llama) | Local LLM inference for translation | MIT | https://github.com/ggerganov/llama.cpp |
+
+### How They Are Used
+
+- **whisper.cpp**: transcribes input audio/video into text segments.
+- **llama.cpp**: translates recognized text into the target language.
+- The generated text is then written to **SRT/ASS**, and can be muxed into MKV.
+
+### License Notice
+
+Both `whisper.cpp` and `llama.cpp` are licensed under the MIT License.  
+Please keep their license texts in your distribution as required.
