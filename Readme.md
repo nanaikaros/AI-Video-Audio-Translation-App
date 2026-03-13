@@ -1,33 +1,70 @@
-# AI 音视频 翻译
+# AI Audio/Video Translation App
 
-简介
-- 负责音频识别与翻译，输出带ass字幕的mkv格式视频。
+一个基于本地模型的音视频翻译工具：完成语音识别、翻译、字幕生成，并输出带字幕的视频文件。
 
-主要功能
-- 音频识别（本地模型）
-- 翻译（本地模型）
-- 支持输入 SRT、输出 SRT/ASS
-- 多线程、进度与日志
-- 提供 CLI 或可部署为后端服务的可执行文件
+## Features
 
-目录建议
-- /models/   -> 存放模型文件（ggml / gguf）
-- /bin/      -> 编译生成的可执行文件或服务二进制
-- /samples/  -> 示例输入文件
-- /output/   -> 处理后字幕/视频输出
-- config.json -> 默认运行参数
+- Local ASR (speech-to-text)
+- Local translation
+- Subtitle I/O: SRT input, SRT/ASS output
+- Burn subtitles into video (ASS in MKV)
+- Multi-thread processing
+- Progress display and logging
+- CLI mode and backend-service mode
 
-先决条件（macOS）
-- ffmpeg：brew install ffmpeg
-- 必要的构建工具（取决于项目语言，如 gcc/clang、CMake、make、go、cargo）：请按项目 README 的构建说明安装
-- 足够的磁盘与内存用于模型加载
+---
 
-模型与资源放置
-- 将模型文件放入 /models/，示例：
-  - /models/ggml-large-v3.bin
-  - /models/HY-MT1.5-1.8B-GGUF.gguf
+## Environment Setup & Build
 
-配置示例（config.json）
+### 1) Prerequisites (macOS)
+
+- **ffmpeg**
+  ```bash
+  brew install ffmpeg
+  ```
+- Build tools (install based on your stack):
+  - clang / gcc
+  - cmake / make
+- **Node.js (for Electron UI)**
+  ```bash
+  brew install node
+  node -v
+  npm -v
+  ```
+
+### 2) Project Structure (suggested)
+
+```text
+/models/    # model files (ggml / gguf)
+/bin/       # built executables
+/samples/   # sample input files
+/output/    # generated subtitles/videos
+config.json # default runtime config
+```
+
+### 3) Put Models
+
+Example:
+
+- `./models/ggml-large-v3.bin`
+- `./models/HY-MT1.5-1.8B-GGUF.gguf`
+
+### 4) Build (example)
+
+```bash
+cd ${your project path}
+mkdir -p build && cd build
+cmake .. && make
+```
+
+> If your repository uses other build tools, replace the commands accordingly.
+
+---
+
+## Configuration
+
+Example `config.json`:
+
 ```json
 {
   "audioModel": "./models/ggml-large-v3.bin",
@@ -43,23 +80,95 @@
 }
 ```
 
-安装与运行（示例）
-1. 切换到项目目录：
-   ```bash
-   cd /test
-   ```
-2. 若项目有构建脚本，编译生成二进制（示例）：
-   ```bash
-   # 示例：根据项目实际构建命令替换
-   mkdir -p build && cd build
-   cmake .. && make -j4
-   ```
-3. 运行 CLI / 服务（示例）：
-   ```bash
-   ./build/my_app -v [video path] -w [whisper model] -m [translation model] -t [thread] -o [output video path]
-   ```
+## Electron Build & Run (UI)
 
-注意事项
-- 模型体积大且占内存，确保目标机器资源充足。
-- 使用 Intl 或后端本地化方案处理时间/数字格式；若需要多语言 UI，可由独立前端对接此后端。
-- 若翻译质量不足，尝试替换或微调翻译模型。
+### 1) Install dependencies
+
+```bash
+cd ${your project path}/electronapp
+npm install
+```
+
+### 2) Run Electron in development mode
+
+```bash
+cd ${your project path}/electronapp
+npm run dev
+```
+
+### 3) Build Electron desktop app
+
+```bash
+cd ${your project path}/electronapp
+npm run build:mac
+```
+
+### 6) Package installer (if configured)
+
+```bash
+cd ${your project path}/electronapp
+npm run dist
+```
+
+生成物通常位于：
+
+- `electronapp/dist/` (dmg/exe)
+
+--- 
+### Output artifacts
+
+- `./output/output.srt`
+- `./output/output.ass`
+- `./output/output.mkv` (video with subtitles)
+
+
+## How to Run
+
+### CLI mode (example)
+
+```bash
+cd ${your project path}
+./build/my_app \
+  -v ./samples/input.mp4 \
+  -w ./models/ggml-large-v3.bin \
+  -m ./models/HY-MT1.5-1.8B-GGUF.gguf \
+  -t 4 \
+  -o ./output/
+```
+
+## Result Preview
+
+### 1) Running ui
+
+![Running ui](./docs/images/electron-ui.png)
+
+### 2) Subtitle Output (ASS)
+
+```ass
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1920
+PlayResY: 1080
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,70,&H00FFFFFF,&H000000FF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,3,2,2,29,29,32,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.03,0:00:03.69,Default,,0,0,0,,相反，我得到了大家的支持，也因此充满了能量。
+Dialogue: 0,0:00:03.69,0:00:05.09,Default,,0,0,0,,有些回忆是被我们刻意改变的。
+Dialogue: 0,0:00:05.09,0:00:06.61,Default,,0,0,0,,请尽情释放你的力量吧。
+```
+
+## TODO
+
+- [✅] macOS support
+- [ ] Windows support (TBD)
+
+
+## Notes
+
+- Model files are large and memory-intensive; ensure enough disk and RAM.
+- If translation quality is unsatisfactory, switch/fine-tune the translation model.
+- For multilingual UI, connect a separate frontend to this backend/CLI.
