@@ -18,9 +18,9 @@
 
 ### 1) Prerequisites (macOS)
 
-- **ffmpeg**
+- **ffmpeg,llama.cpp,whisper-cpp**
   ```bash
-  brew install ffmpeg
+  brew install ffmpeg llama.cpp whisper-cpp 
   ```
 - Build tools (install based on your stack):
   - clang / gcc
@@ -85,34 +85,34 @@ Example `config.json`:
 ### 1) Install dependencies
 
 ```bash
-cd ${your project path}/electronapp
+cd ${your project path}/electron
 npm install
 ```
 
 ### 2) Run Electron in development mode
 
 ```bash
-cd ${your project path}/electronapp
+cd ${your project path}/electron
 npm run dev
 ```
 
 ### 3) Build Electron desktop app
 
 ```bash
-cd ${your project path}/electronapp
+cd ${your project path}/electron
 npm run build:mac
 ```
 
 ### 6) Package installer (if configured)
 
 ```bash
-cd ${your project path}/electronapp
+cd ${your project path}/electron
 npm run dist
 ```
 
 生成物通常位于：
 
-- `electronapp/dist/` (dmg/exe)
+- `electron/dist/` (dmg/exe)
 
 --- 
 ### Output artifacts

@@ -1,8 +1,8 @@
 #include "common/common.h"
 #include "common/common-whisper.h"
-
-#include "whisper.h"
 #include "grammar-parser.h"
+
+#include <whisper.h>
 #include "../include/whisper_bridge.h"
 
 #include <cmath>

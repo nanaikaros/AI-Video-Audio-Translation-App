@@ -1,9 +1,6 @@
 #pragma once
 #include "../include/params.h"
 
-#include "spdlog/sinks/basic_file_sink.h"
-#include "spdlog/spdlog.h"
-
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
