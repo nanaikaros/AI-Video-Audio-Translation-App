@@ -9,7 +9,7 @@
   },
   "build": {
     "appId": "com.wang.myapp",
-    "productName": "AI Translation Tool",
+    "productName": "my_app",
     "files": [
       "src/**/*",
       "package.json"
