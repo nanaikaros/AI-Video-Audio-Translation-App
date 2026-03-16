@@ -4,13 +4,18 @@ project(AIVideoTranslationApp)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+if(WIN32)
+
+elseif(APPLE)
 option(USE_SYSTEM_DEPS "Use Homebrew-installed llama/whisper" ON)
+endif()
 
 set(DEPS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/deps)
 set(THIRD_PARTY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
 
 if (WIN32)
-  # todo: win
+  # vcpkg
+
 elseif(APPLE)
   find_package(PkgConfig REQUIRED)
   pkg_check_modules(AVCODEC REQUIRED IMPORTED_TARGET libavcodec)
@@ -34,6 +39,16 @@ add_executable(my_app
 target_include_directories(my_app PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+
+if(WIN32)
+  set_target_properties(my_app PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/bin/Debug"
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/bin/Release"
+    RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_BINARY_DIR}/bin/RelWithDebInfo"
+    RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL "${CMAKE_BINARY_DIR}/bin/MinSizeRel"
+  )
+endif()
 
 if (USE_SYSTEM_DEPS)
   if (APPLE)
@@ -69,7 +84,7 @@ if (USE_SYSTEM_DEPS)
       ${GGML_METAL_LIBRARY}
     )
   elseif(WIN32)
-    message(FATAL_ERROR "System dependencies are not supported on Windows yet.")
+
   endif()
 
 else()
@@ -83,13 +98,16 @@ else()
 endif()
 
 if(WIN32)
+  # vcpkg
+  find_package(FFMPEG REQUIRED)
+
+  target_include_directories(my_app PRIVATE
+    ${FFMPEG_INCLUDE_DIRS}
+  )
+
   target_link_libraries(my_app PRIVATE
     Ws2_32
-    ${AVCODEC_LIBRARY}
-    ${AVFORMAT_LIBRARY}
-    ${AVUTIL_LIBRARY}
-    ${SWSCALE_LIBRARY}
-    ${SWRESAMPLE_LIBRARY}
+    ${FFMPEG_LIBRARIES}
   )
 elseif(APPLE)
   target_link_libraries(my_app PRIVATE

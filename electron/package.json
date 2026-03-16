@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "electron .",
     "build:mac": "electron-builder --mac --arm64 --publish=never",
-    "build:win": "npm run pack:backend:win && electron-builder --win --x64 --publish=never"
+    "build:win": "electron-builder --win --x64 --publish=never"
   },
   "build": {
     "appId": "com.wang.myapp",

@@ -6,11 +6,12 @@
 #else
 #include <sys/socket.h>
 #include <sys/un.h>
-#endif
 #include <unistd.h>
+#endif
 #include <cstring>
 #include <mutex>
 #include <algorithm>
+#include <cmath>
 
 namespace {
 #if defined(_WIN32)
@@ -26,22 +27,26 @@ bool progress_ipc_init(const std::string& sock_path) {
     if (sock_path.empty()) return false;
 
     #if defined(_WIN32)
-    WSADATA wsa;
-    if (!wsa_started) {
-        if (WSAStartup(MAKEWORD(2,2), &wsa) != 0) return false;
-        wsa_started = true;
-    }
-
     addrinfo hints{}, *res = nullptr;
-    hints.ai_family = AF_INET;
+    hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
 
+    auto pos = sock_path.find(':');
+    std::string host = (pos == std::string::npos) ? sock_path : sock_path.substr(0, pos);
+    std::string port = (pos == std::string::npos) ? "0" : sock_path.substr(pos + 1);
+
+    if (getaddrinfo(host.c_str(), port.c_str(), &hints, &res) != 0) return false;
+
     SOCKET s = ::socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-    if (s == INVALID_SOCKET) return false;
+    if (s == INVALID_SOCKET) { freeaddrinfo(res); return false; }
 
     if (connect(s, res->ai_addr, (int)res->ai_addrlen) != 0) {
+        closesocket(s);
+        freeaddrinfo(res);
         return false;
     }
+
+    freeaddrinfo(res);
     #else
     int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
     if (fd < 0) return false;
@@ -117,7 +122,7 @@ void progress_ipc_send(const std::string& stage, int progress) {
     #else
     if (g_fd < 0) return;
     #endif
-    progress = std::max(0, std::min(100, progress));
+    progress = (std::max)(0, (std::min)(100, progress));
     std::string msg = "{\"kind\":\"progress\",\"stage\":\"" + stage + "\",\"progress\":" + std::to_string(progress) + "}\n";
     send_msg(msg);
 }

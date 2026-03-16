@@ -16,20 +16,34 @@
 
 ## Environment Setup & Build
 
-### 1) Prerequisites (macOS)
+### 1) Prerequisites
 
-- **ffmpeg,llama.cpp,whisper-cpp**
+- **ffmpeg llama.cpp whisper-cpp**
+
+  mac
   ```bash
   brew install ffmpeg llama.cpp whisper-cpp 
   ```
+
+  win
+  ```powershell
+  vcpkg.exe install ffmpeg:x64-windows llama-cpp whisper-cpp 
+  ```
+
 - Build tools (install based on your stack):
   - clang / gcc
   - cmake / make
 - **Node.js (for Electron UI)**
+
+  mac
   ```bash
   brew install node
   node -v
   npm -v
+  ```
+
+  win
+  ```powershell
   ```
 
 ### 2) Project Structure (suggested)
@@ -51,10 +65,17 @@ Example:
 
 ### 4) Build (example)
 
+mac
 ```bash
 cd ${your project path}
 mkdir -p build && cd build
 cmake .. && make
+```
+
+win
+```powershell
+cmake -S . -B build -G "Visual Studio 18 2026" -A x64 -DCMAKE_TOOLCHAIN_FILE=C:/path/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows
+cmake --build build --config Release
 ```
 
 > If your repository uses other build tools, replace the commands accordingly.
@@ -80,6 +101,13 @@ Example `config.json`:
 }
 ```
 
+**model download:**
+
+```
+https://hf-mirror.com/ggerganov/whisper.cpp/blob/main/ggml-large-v3.bin
+https://hf-mirror.com/tencent/HY-MT1.5-7B-GGUF/blob/main/HY-MT1.5-7B-Q8_0.gguf
+```
+
 ## Electron Build & Run (UI)
 
 ### 1) Install dependencies
@@ -98,9 +126,16 @@ npm run dev
 
 ### 3) Build Electron desktop app
 
+mac
 ```bash
 cd ${your project path}/electron
 npm run build:mac
+```
+
+win
+```powershell
+cd ${your project path}/electron
+npm run build:win
 ```
 
 ### 6) Package installer (if configured)

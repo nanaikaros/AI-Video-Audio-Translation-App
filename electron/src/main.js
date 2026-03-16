@@ -83,7 +83,12 @@ function getBackendBin() {
   if (app.isPackaged) {
     return path.join(process.resourcesPath, 'backend', 'my_app');
   }
-  return path.join(app.getAppPath(), 'backend', 'my_app');
+  // win
+  if (process.platform === 'win32') {
+    return path.join(app.getAppPath(), '../build/bin/Debug/my_app.exe');
+  }
+  // mac
+  return path.join(app.getAppPath(), '../build', 'my_app');
 }
 
 ipcMain.handle('run-cpp-pipeline', async (event, payload) => {

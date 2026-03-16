@@ -60,3 +60,8 @@ todo:
   1. 视频图片翻译 orc
   2. 前端多语言
   3. 跨平台 windows平台的开发
+  vcpkg.exe install ffmpeg:x64-windows
+  cmake -S . -B build ^
+  -DCMAKE_TOOLCHAIN_FILE=C:/code/vcpkg/scripts/buildsystems/vcpkg.cmake ^
+  -DVCPKG_TARGET_TRIPLET=x64-windows
+  cmake --build build --config Release
