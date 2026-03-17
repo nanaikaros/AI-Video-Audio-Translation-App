@@ -296,7 +296,7 @@ int whisper_start(ai_translation_parmas& atp, output_params& out, pipeline_buffe
     params.n_processors   = 4;
     params.model          = atp.whisper_model_path;
     params.language       = "auto";
-    params.no_prints      = true;
+    params.no_prints      = false;
     params.print_progress = true;
     params.output_srt     = false;
 

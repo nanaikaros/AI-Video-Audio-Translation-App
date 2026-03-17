@@ -1,0 +1,7 @@
+{
+  "dependencies": [
+    "ffmpeg",
+    "llama-cpp",
+    "whisper-cpp"
+  ]
+}

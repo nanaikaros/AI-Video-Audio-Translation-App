@@ -110,7 +110,7 @@ int translation_start(ai_translation_parmas& atp, pipeline_buffer& buffer) {
     int workers = atp.thread_num? atp.thread_num : 1;
     int n_predict = 64;
     int ngl = -1;
-    bool print_log = false;
+    bool print_log = true;
     bool show_progress = true;
 
     if (model_path.empty() || in_srt.empty()) {

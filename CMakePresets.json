@@ -1,0 +1,27 @@
+{
+  "version": 2,
+  "configurePresets": [
+    {
+      "name": "windows-default",
+      "displayName": "Windows x64",
+      "description": "Sets Ninja generator, compilers, x64 architecture",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_TARGET_TRIPLET": "x64-windows"
+      },
+      "vendor": {
+        "microsoft.com/VisualStudioSettings/CMake/1.0": {
+          "hostOS": [ "Windows" ]
+        }
+      }
+    }
+  ]
+}
+

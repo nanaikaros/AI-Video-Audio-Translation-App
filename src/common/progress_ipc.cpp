@@ -2,7 +2,6 @@
 
 #if defined(_WIN32)
 #include <winsock2.h>
-#include <ws2tcpip.h>
 #else
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -15,8 +14,7 @@
 
 namespace {
 #if defined(_WIN32)
-SOCKET g_sock = INVALID_SOCKET;
-bool wsa_started = false;
+HANDLE g_pipe = INVALID_HANDLE_VALUE;
 #else
 int g_fd = -1;
 #endif
@@ -27,26 +25,31 @@ bool progress_ipc_init(const std::string& sock_path) {
     if (sock_path.empty()) return false;
 
     #if defined(_WIN32)
-    addrinfo hints{}, *res = nullptr;
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
+    HANDLE h = INVALID_HANDLE_VALUE;
 
-    auto pos = sock_path.find(':');
-    std::string host = (pos == std::string::npos) ? sock_path : sock_path.substr(0, pos);
-    std::string port = (pos == std::string::npos) ? "0" : sock_path.substr(pos + 1);
+    h = CreateFileA(
+        sock_path.c_str(),
+        GENERIC_WRITE,
+        0,
+        nullptr,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL,
+        nullptr
+    );
+    if (h == INVALID_HANDLE_VALUE) return false;
 
-    if (getaddrinfo(host.c_str(), port.c_str(), &hints, &res) != 0) return false;
+    DWORD err = GetLastError();
 
-    SOCKET s = ::socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-    if (s == INVALID_SOCKET) { freeaddrinfo(res); return false; }
-
-    if (connect(s, res->ai_addr, (int)res->ai_addrlen) != 0) {
-        closesocket(s);
-        freeaddrinfo(res);
-        return false;
+    if (err == ERROR_PIPE_BUSY) {
+        if (!WaitNamedPipeA(sock_path.c_str(), 200)) {
+            Sleep(20);
+        } else if (err == ERROR_FILE_NOT_FOUND) {
+            Sleep(20);
+        } else {
+            return false;
+        }
     }
-
-    freeaddrinfo(res);
+    if (h == INVALID_HANDLE_VALUE) return false;
     #else
     int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
     if (fd < 0) return false;
@@ -62,7 +65,7 @@ bool progress_ipc_init(const std::string& sock_path) {
     #endif
     std::lock_guard<std::mutex> lk(g_mu);
     #if defined(_WIN32)
-    g_sock = s;
+    g_pipe = h;
     #else
     g_fd = fd;
     #endif
@@ -87,7 +90,8 @@ static std::string json_escape(const std::string &s) {
 
 void send_msg(std::string msg){
     #if defined(_WIN32)
-    send(g_sock, msg.data(), (int)msg.size(), 0);
+    DWORD written = 0;
+    (void)WriteFile(g_pipe, msg.data(), (DWORD)msg.size(), &written, nullptr);
     #else
     (void)::write(g_fd, msg.data(), msg.size());
     #endif
@@ -96,7 +100,7 @@ void send_msg(std::string msg){
 void progress_ipc_send_output(const std::string& path){
     std::lock_guard<std::mutex> lk(g_mu);
     #if defined(_WIN32)
-    if (g_sock == INVALID_SOCKET) return;
+    if (g_pipe == INVALID_HANDLE_VALUE) return;
     #else
     if (g_fd < 0) return;
     #endif
@@ -107,7 +111,7 @@ void progress_ipc_send_output(const std::string& path){
 void progress_ipc_send_stage(const std::string& stage, const std::string& status) {
     std::lock_guard<std::mutex> lk(g_mu);
     #if defined(_WIN32)
-    if (g_sock == INVALID_SOCKET) return;
+    if (g_pipe == INVALID_HANDLE_VALUE) return;
     #else
     if (g_fd < 0) return;
     #endif
@@ -118,7 +122,7 @@ void progress_ipc_send_stage(const std::string& stage, const std::string& status
 void progress_ipc_send(const std::string& stage, int progress) {
     std::lock_guard<std::mutex> lk(g_mu);
     #if defined(_WIN32)
-    if (g_sock == INVALID_SOCKET) return;
+    if (g_pipe == INVALID_HANDLE_VALUE) return;
     #else
     if (g_fd < 0) return;
     #endif
@@ -130,13 +134,9 @@ void progress_ipc_send(const std::string& stage, int progress) {
 void progress_ipc_close() {
     std::lock_guard<std::mutex> lk(g_mu);
     #if defined(_WIN32)
-    if (g_sock != INVALID_SOCKET) {
-        closesocket(g_sock);
-        g_sock = INVALID_SOCKET;
-    }
-    if (wsa_started) {
-        WSACleanup();
-        wsa_started = false;
+    if (g_pipe != INVALID_HANDLE_VALUE) {
+        CloseHandle(g_pipe);
+        g_pipe = INVALID_HANDLE_VALUE;
     }
     #else
     if (g_fd >= 0) {

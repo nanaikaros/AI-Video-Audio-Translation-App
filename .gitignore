@@ -10,3 +10,5 @@
 electron/node_modules/
 electron/dist/
 /scripts/
+CMakeUserPresets.json
+/vcpkg_installed/

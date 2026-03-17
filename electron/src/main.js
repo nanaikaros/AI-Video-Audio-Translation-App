@@ -82,14 +82,14 @@ ipcMain.handle('pick-dir', async () => {
 function getBackendBin() {
   if (app.isPackaged) {
     if (process.platform === 'win32') {
-      return path.join(process.resourcesPath, 'backend\\bin\\Debug', 'my_app.exe');
+      return path.join(process.resourcesPath, 'backend\\bin\\Release', 'my_app.exe');
     } else{
       return path.join(process.resourcesPath, 'my_app');  
     }
   }
   // win
   if (process.platform === 'win32') {
-    return path.join(app.getAppPath(), '../build/bin/Debug/my_app.exe');
+    return path.join(app.getAppPath(), '../build/bin/Release/my_app.exe');
   }
   // mac
   return path.join(app.getAppPath(), '../build', 'my_app');
@@ -127,7 +127,9 @@ ipcMain.handle('run-cpp-pipeline', async (event, payload) => {
     ? `\\\\.\\pipe\\cpp-progress-${process.pid}-${Date.now()}`
     : path.join(os.tmpdir(), `cpp-progress-${process.pid}-${Date.now()}.sock`);
 
-  if (fs.existsSync(sockPath)) fs.unlinkSync(sockPath);
+  if (!isWin) {
+    if (fs.existsSync(sockPath)) fs.unlinkSync(sockPath);
+  }
 
   let gotDoneStage = false;
   let gotAnyProgress = false;
@@ -242,16 +244,16 @@ ipcMain.handle('run-cpp-pipeline', async (event, payload) => {
     child.stderr.on('data', (buf) => {
       const t = buf.toString();
       event.sender.send('cpp-log', { type: 'stderr', text: t });
-      try {
-        if(t.toLowerCase().includes('could not update timestamps for skipped samples')) {}
-        else {
-          dialog.showMessageBox(mainWindow, {
-            type: 'error',
-            title: 'Error from backend',
-            message: t,
-          });
-        }
-      } catch (e) {}
+      // try {
+      //   if(t.toLowerCase().includes('could not update timestamps for skipped samples')) {}
+      //   else {
+      //     dialog.showMessageBox(mainWindow, {
+      //       type: 'error',
+      //       title: 'Error from backend',
+      //       message: t,
+      //     });
+      //   }
+      // } catch (e) {}
       log.error(`[cpp stderr] ${t.trimEnd()}`);
     });
 

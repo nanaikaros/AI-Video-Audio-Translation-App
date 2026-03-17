@@ -4,14 +4,10 @@ project(AIVideoTranslationApp)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-if(WIN32)
+option(USE_SYSTEM_DEPS "Use local ffmpeg llama whisper" ON)
 
-elseif(APPLE)
-option(USE_SYSTEM_DEPS "Use Homebrew-installed llama/whisper" ON)
-endif()
-
-set(DEPS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/deps)
-set(THIRD_PARTY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
+if(!USE_SYSTEM_DEPS)
+  set(THIRD_PARTY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
 
 if (WIN32)
   # vcpkg
@@ -84,6 +80,14 @@ if (USE_SYSTEM_DEPS)
       ${GGML_METAL_LIBRARY}
     )
   elseif(WIN32)
+    # vcpkg find llama whisper
+    find_package(llama CONFIG REQUIRED)
+    find_package(whisper CONFIG REQUIRED)
+
+    target_link_libraries(my_app PRIVATE
+      llama
+      whisper
+    )
 
   endif()
 
