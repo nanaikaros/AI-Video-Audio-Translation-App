@@ -82,7 +82,7 @@ ipcMain.handle('pick-dir', async () => {
 function getBackendBin() {
   if (app.isPackaged) {
     if (process.platform === 'win32') {
-      return path.join(process.resourcesPath, 'backend\\bin\\Release', 'my_app.exe');
+      return path.join(process.resourcesPath, 'backend\\bin', 'my_app.exe');
     } else{
       return path.join(process.resourcesPath, 'my_app');  
     }
