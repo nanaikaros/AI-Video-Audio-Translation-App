@@ -6,7 +6,6 @@
 *.so
 *.dll
 *.log
-*.cmake
 .DS_Store
 
 # electron build artifacts
