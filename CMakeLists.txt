@@ -4,31 +4,46 @@ project(AIVideoTranslationApp)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(USE_SYSTEM_DEPS "Use local ffmpeg llama whisper" ON)
+option(USE_SYSTEM_DEPS "Use local ffmpeg llama whisper" OFF)  
+option(USE_SYSTEM_GGML "Use system-installed GGML library" OFF)
 
-if(!USE_SYSTEM_DEPS)
-  set(THIRD_PARTY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
+set(GGML_SRC_DIR    ${CMAKE_CURRENT_SOURCE_DIR}/ggml)
+set(WHISPER_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/whisper)
+set(LLAMA_SRC_DIR   ${CMAKE_CURRENT_SOURCE_DIR}/src/llama)
 
-if (WIN32)
-  # vcpkg
+set(WHISPER_USE_SYSTEM_GGML ON CACHE BOOL "" FORCE)
+set(LLAMA_USE_SYSTEM_GGML   ON CACHE BOOL "" FORCE)
 
-elseif(APPLE)
-  find_package(PkgConfig REQUIRED)
-  pkg_check_modules(AVCODEC REQUIRED IMPORTED_TARGET libavcodec)
-  pkg_check_modules(AVFORMAT REQUIRED IMPORTED_TARGET libavformat)
-  pkg_check_modules(AVUTIL REQUIRED IMPORTED_TARGET libavutil)
-  pkg_check_modules(SWSCALE REQUIRED IMPORTED_TARGET libswscale)
-  pkg_check_modules(SWRESAMPLE REQUIRED IMPORTED_TARGET libswresample)
+#
+# build the ggml library
+#
+add_subdirectory(${GGML_SRC_DIR} ggml_build)
+if(WIN32)
+    # The following adds a _DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR macro and is a workaround for
+    # the Windows C++ standard library which does not support constexpr mutexes.
+    # From the release notes://github.com/microsoft/STL/wiki/Changelog
+    #  Disable constexpr mutex constructor on Windows
+    #  Fixed mutex's constructor to be constexpr. #3824 #4000 #4339
+    #  Note: Programs that aren't following the documented restrictions on binary compatibility may encounter
+    #  null dereferences in mutex machinery. You must follow this rule:
+    #  When you mix binaries built by different supported versions of the toolset, the Redistributable version
+    #  must be at least as new as the latest toolset used by any app component.
+    #  You can define _DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR as an escape hatch.
+    #
+    # Specifically to whisper.cpp this would cause a crash when using the Java bindings.
+    # resulting in a Invalid memory access error.
+    target_compile_definitions(ggml-base PRIVATE _DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR)
 endif()
+
+
+add_subdirectory(${WHISPER_SRC_DIR} whisper_build)
+add_subdirectory(${LLAMA_SRC_DIR} llama_build)
 
 add_executable(my_app
     src/translation/translation.cpp
     src/video/video.cpp
     src/whisper/whisper_bridge.cpp
-    src/whisper/common/common-whisper.cpp
-    src/whisper/common/common.cpp
-    src/whisper/grammar-parser.cpp
-    src/common/progress_ipc.cpp
+    common/progress_ipc.cpp
     main.cpp
 )
 
@@ -46,79 +61,16 @@ if(WIN32)
   )
 endif()
 
-if (USE_SYSTEM_DEPS)
-  if (APPLE)
-    execute_process(COMMAND brew --prefix llama.cpp OUTPUT_VARIABLE LLAMA_PREFIX OUTPUT_STRIP_TRAILING_WHITESPACE)
-    execute_process(COMMAND brew --prefix whisper-cpp OUTPUT_VARIABLE WHISPER_PREFIX OUTPUT_STRIP_TRAILING_WHITESPACE)
+target_link_libraries(my_app PRIVATE 
+  llama
+  whisper
+)
 
-    find_path(LLAMA_INCLUDE_DIR llama.h PATHS ${LLAMA_PREFIX}/include REQUIRED)
-    find_path(WHISPER_INCLUDE_DIR whisper.h PATHS ${WHISPER_PREFIX}/include REQUIRED)
-    find_path(GGML_INCLUDE_DIR ggml.h PATHS ${LLAMA_PREFIX}/include ${WHISPER_PREFIX}/include REQUIRED)
-    
-    find_library(LLAMA_LIBRARY llama PATHS ${LLAMA_PREFIX}/lib REQUIRED)
-    find_library(WHISPER_LIBRARY whisper PATHS ${WHISPER_PREFIX}/lib REQUIRED)
-    
-    find_library(GGML_LIBRARY ggml PATHS ${LLAMA_PREFIX}/lib ${WHISPER_PREFIX}/lib)
-    find_library(GGML_BASE_LIBRARY ggml-base PATHS ${LLAMA_PREFIX}/lib ${WHISPER_PREFIX}/lib)
-    find_library(GGML_CPU_LIBRARY ggml-cpu PATHS ${LLAMA_PREFIX}/lib ${WHISPER_PREFIX}/lib)
-    find_library(GGML_BLAS_LIBRARY ggml-blas PATHS ${LLAMA_PREFIX}/lib ${WHISPER_PREFIX}/lib)
-    find_library(GGML_METAL_LIBRARY ggml-metal PATHS ${LLAMA_PREFIX}/lib ${WHISPER_PREFIX}/lib)
-
-    target_include_directories(my_app PRIVATE
-      ${LLAMA_INCLUDE_DIR}
-      ${WHISPER_INCLUDE_DIR}
-      ${GGML_INCLUDE_DIR}
-    )
-
-    target_link_libraries(my_app PRIVATE
-      ${LLAMA_LIBRARY}
-      ${WHISPER_LIBRARY}
-      ${GGML_LIBRARY}
-      ${GGML_BASE_LIBRARY}
-      ${GGML_CPU_LIBRARY}
-      ${GGML_BLAS_LIBRARY}
-      ${GGML_METAL_LIBRARY}
-    )
-  elseif(WIN32)
-    # vcpkg find llama whisper
-    find_package(llama CONFIG REQUIRED)
-    find_package(whisper CONFIG REQUIRED)
-
-    target_link_libraries(my_app PRIVATE
-      llama
-      whisper
-    )
-
-  endif()
-
-else()
-  add_subdirectory(${THIRD_PARTY_DIR}/llama.cpp llama_cpp_build EXCLUDE_FROM_ALL)
-  add_subdirectory(${THIRD_PARTY_DIR}/whisper.cpp whisper_build EXCLUDE_FROM_ALL)
-
-  target_link_libraries(my_app PRIVATE
-    llama
-    whisper
-  )
-endif()
-
+# vcpkg
+find_package(FFMPEG REQUIRED)
+target_include_directories(my_app PRIVATE ${FFMPEG_INCLUDE_DIRS})
 if(WIN32)
-  # vcpkg
-  find_package(FFMPEG REQUIRED)
-
-  target_include_directories(my_app PRIVATE
-    ${FFMPEG_INCLUDE_DIRS}
-  )
-
-  target_link_libraries(my_app PRIVATE
-    Ws2_32
-    ${FFMPEG_LIBRARIES}
-  )
+  target_link_libraries(my_app PRIVATE Ws2_32 ${FFMPEG_LIBRARIES})
 elseif(APPLE)
-  target_link_libraries(my_app PRIVATE
-    PkgConfig::AVCODEC
-    PkgConfig::AVFORMAT
-    PkgConfig::AVUTIL
-    PkgConfig::SWSCALE
-    PkgConfig::SWRESAMPLE
-  )
+  target_link_libraries(my_app PRIVATE ${FFMPEG_LIBRARIES})
 endif()

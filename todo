@@ -59,8 +59,6 @@ todo：
 todo:
   1. 视频图片翻译 orc
   2. 前端多语言
-  3. 跨平台 windows平台的开发
+  3. 跨平台 windows平台的开发 ✅
   4. 改ipc逻辑 ✅
-  vcpkg.exe install ffmpeg:x64-windows
-cmake -S . -B build -A x64 -DVCPKG_TARGET_TRIPLET=x64-windows
-cmake --build build --config Release
+  5. 修改依赖关系 不再依赖llama和whisper库 ✅

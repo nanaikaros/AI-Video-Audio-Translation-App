@@ -1,14 +1,18 @@
+# build
 /build/
-/build-win/
+
+# generated files
 *.dylib
 *.so
 *.dll
 *.log
 *.cmake
 .DS_Store
-/third_party/
+
+# electron build artifacts
 electron/node_modules/
 electron/dist/
-/scripts/
+
+# vcpkg build artifacts
 CMakeUserPresets.json
 /vcpkg_installed/

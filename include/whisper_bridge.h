@@ -2,6 +2,7 @@
 
 #include "params.h"
 #include "progress_ipc.h"
+#include "common-whisper.h"
 
 #include <string>
 #include <vector>

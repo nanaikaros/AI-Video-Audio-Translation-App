@@ -1,5 +1,3 @@
-#include "common/common.h"
-#include "common/common-whisper.h"
 #include "grammar-parser.h"
 
 #include <whisper.h>
@@ -22,6 +20,27 @@
 #endif
 #include <windows.h>
 #endif
+
+//  500 -> 00:05.000
+// 6000 -> 01:00.000
+std::string to_timestamp(int64_t t, bool comma) {
+    int64_t msec = t * 10;
+    int64_t hr = msec / (1000 * 60 * 60);
+    msec = msec - hr * (1000 * 60 * 60);
+    int64_t min = msec / (1000 * 60);
+    msec = msec - min * (1000 * 60);
+    int64_t sec = msec / 1000;
+    msec = msec - sec * 1000;
+
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%02d:%02d:%02d%s%03d", (int) hr, (int) min, (int) sec, comma ? "," : ".", (int) msec);
+
+    return std::string(buf);
+}
+
+int timestamp_to_sample(int64_t t, int n_samples, int whisper_sample_rate) {
+    return std::max(0, std::min((int) n_samples - 1, (int) ((t*whisper_sample_rate)/100)));
+}
 
 // command-line parameters
 struct whisper_params {
@@ -197,51 +216,51 @@ static void whisper_print_segment_callback(struct whisper_context * ctx, struct 
             speaker = estimate_diarization_speaker(pcmf32s, t0, t1);
         }
 
-        if (params.print_colors) {
-            for (int j = 0; j < whisper_full_n_tokens(ctx, i); ++j) {
-                if (params.print_special == false) {
-                    const whisper_token id = whisper_full_get_token_id(ctx, i, j);
-                    if (id >= whisper_token_eot(ctx)) {
-                        continue;
-                    }
-                }
+        // if (params.print_colors) {
+        //     for (int j = 0; j < whisper_full_n_tokens(ctx, i); ++j) {
+        //         if (params.print_special == false) {
+        //             const whisper_token id = whisper_full_get_token_id(ctx, i, j);
+        //             if (id >= whisper_token_eot(ctx)) {
+        //                 continue;
+        //             }
+        //         }
 
-                const char * text = whisper_full_get_token_text(ctx, i, j);
-                const float  p    = whisper_full_get_token_p   (ctx, i, j);
+        //         const char * text = whisper_full_get_token_text(ctx, i, j);
+        //         const float  p    = whisper_full_get_token_p   (ctx, i, j);
 
-                const int n_colors = (int) k_colors.size();
-                int raw_col = (int) (std::pow(p, 3)*float(n_colors));
-                if (raw_col < 0) raw_col = 0;
-                if (raw_col > n_colors - 1) raw_col = n_colors - 1;
-                const int col = raw_col;
+        //         const int n_colors = (int) k_colors.size();
+        //         int raw_col = (int) (std::pow(p, 3)*float(n_colors));
+        //         if (raw_col < 0) raw_col = 0;
+        //         if (raw_col > n_colors - 1) raw_col = n_colors - 1;
+        //         const int col = raw_col;
 
-                printf("%s%s%s%s", speaker.c_str(), k_colors[col].c_str(), text, "\033[0m");
-            }
-        } else if (params.print_confidence) {
-            for (int j = 0; j < whisper_full_n_tokens(ctx, i); ++j) {
-                if (params.print_special == false) {
-                    const whisper_token id = whisper_full_get_token_id(ctx, i, j);
-                    if (id >= whisper_token_eot(ctx)) {
-                        continue;
-                    }
-                }
+        //         printf("%s%s%s%s", speaker.c_str(), k_colors[col].c_str(), text, "\033[0m");
+        //     }
+        // } else if (params.print_confidence) {
+        //     for (int j = 0; j < whisper_full_n_tokens(ctx, i); ++j) {
+        //         if (params.print_special == false) {
+        //             const whisper_token id = whisper_full_get_token_id(ctx, i, j);
+        //             if (id >= whisper_token_eot(ctx)) {
+        //                 continue;
+        //             }
+        //         }
 
-                const char * text = whisper_full_get_token_text(ctx, i, j);
-                const float  p    = whisper_full_get_token_p   (ctx, i, j);
+        //         const char * text = whisper_full_get_token_text(ctx, i, j);
+        //         const float  p    = whisper_full_get_token_p   (ctx, i, j);
 
-                int style_idx = 2;     // High confidence - dim
-                if (p < 0.33) {
-                    style_idx = 0;     // Low confidence - inverse (highlighted)
-                } else if (p < 0.66) {
-                    style_idx = 1;     // Medium confidence - underlined
-                }
-                printf("%s%s%s%s", speaker.c_str(), k_styles[style_idx].c_str(), text, "\033[0m");
-            }
-        } else {
-            const char * text = whisper_full_get_segment_text(ctx, i);
+        //         int style_idx = 2;     // High confidence - dim
+        //         if (p < 0.33) {
+        //             style_idx = 0;     // Low confidence - inverse (highlighted)
+        //         } else if (p < 0.66) {
+        //             style_idx = 1;     // Medium confidence - underlined
+        //         }
+        //         printf("%s%s%s%s", speaker.c_str(), k_styles[style_idx].c_str(), text, "\033[0m");
+        //     }
+        // } else {
+        const char * text = whisper_full_get_segment_text(ctx, i);
 
-            printf("%s%s", speaker.c_str(), text);
-        }
+        printf("%s%s", speaker.c_str(), text);
+        //}
 
         if (params.tinydiarize) {
             if (whisper_full_get_segment_speaker_turn_next(ctx, i)) {
