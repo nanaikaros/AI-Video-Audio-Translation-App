@@ -15,6 +15,8 @@ extern "C" {
 #include <libswresample/swresample.h>
 #include <libavutil/channel_layout.h>
 #include <libavutil/log.h>
+#include <libswscale/swscale.h>
+#include <libavutil/imgutils.h>
 }
 
 static std::string fferr(int errnum) {
@@ -130,8 +132,159 @@ end:
     return ret;
 }
 
+
+int video_extract_picture(const std::string& in_video, std::vector<OcrFrame>& frames_out, int interval_sec) {
+    frames_out.clear();
+
+    AVFormatContext* inFmt = nullptr;
+    AVCodecContext* decCtx = nullptr;
+    SwsContext* sws = nullptr;
+    AVFrame* inFrame = nullptr;
+    AVPacket* inPkt = nullptr;
+    int videoStream = -1;
+
+    auto cleanup = [&](int code) -> int {
+        if (inPkt) av_packet_free(&inPkt);
+        if (inFrame) av_frame_free(&inFrame);
+        if (sws) sws_freeContext(sws);
+        if (decCtx) avcodec_free_context(&decCtx);
+        if (inFmt) avformat_close_input(&inFmt);
+        return code;
+    };
+
+    if (interval_sec <= 0) interval_sec = 1;
+
+    int ret = avformat_open_input(&inFmt, in_video.c_str(), nullptr, nullptr);
+    if (ret < 0) return cleanup(ret);
+
+    ret = avformat_find_stream_info(inFmt, nullptr);
+    if (ret < 0) return cleanup(ret);
+
+    ret = av_find_best_stream(inFmt, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
+    if (ret < 0) return cleanup(ret);
+    videoStream = ret;
+
+    {
+        AVStream* st = inFmt->streams[videoStream];
+        const AVCodec* dec = avcodec_find_decoder(st->codecpar->codec_id);
+        if (!dec) return cleanup(AVERROR_DECODER_NOT_FOUND);
+
+        decCtx = avcodec_alloc_context3(dec);
+        if (!decCtx) return cleanup(AVERROR(ENOMEM));
+
+        ret = avcodec_parameters_to_context(decCtx, st->codecpar);
+        if (ret < 0) return cleanup(ret);
+
+        ret = avcodec_open2(decCtx, dec, nullptr);
+        if (ret < 0) return cleanup(ret);
+    }
+
+    inFrame = av_frame_alloc();
+    inPkt = av_packet_alloc();
+    if (!inFrame || !inPkt) return cleanup(AVERROR(ENOMEM));
+
+    AVRational tb = inFmt->streams[videoStream]->time_base;
+    const int64_t step_us = (int64_t)interval_sec * 1000000LL;
+    int64_t next_us = 0;
+
+    auto push_frame_if_needed = [&](AVFrame* frm) -> int {
+        int64_t ts = (frm->best_effort_timestamp != AV_NOPTS_VALUE) ? frm->best_effort_timestamp : frm->pts;
+        if (ts == AV_NOPTS_VALUE) return 0;
+
+        int64_t cur_us = av_rescale_q(ts, tb, AVRational{1, 1000000});
+        if (cur_us < next_us) return 0;
+
+        if (!sws) {
+            sws = sws_getContext(
+                frm->width, frm->height, (AVPixelFormat)frm->format,
+                frm->width, frm->height, AV_PIX_FMT_RGB24,
+                SWS_BILINEAR, nullptr, nullptr, nullptr
+            );
+            if (!sws) return AVERROR(ENOMEM);
+        }
+
+        OcrFrame out;
+        out.width = frm->width;
+        out.height = frm->height;
+        out.ts_ms = cur_us / 1000;
+
+        int rgb_linesize = out.width * 3;
+        out.rgb.resize((size_t)rgb_linesize * (size_t)out.height);
+
+        uint8_t* dst_data[4] = { nullptr, nullptr, nullptr, nullptr };
+        int dst_linesize[4] = { 0, 0, 0, 0 };
+
+        int r = av_image_fill_arrays(
+            dst_data, dst_linesize,
+            out.rgb.data(),
+            AV_PIX_FMT_RGB24,
+            out.width, out.height, 1
+        );
+        if (r < 0) return r;
+
+        sws_scale(
+            sws,
+            frm->data, frm->linesize,
+            0, frm->height,
+            dst_data, dst_linesize
+        );
+
+        out.linesize = dst_linesize[0];
+        frames_out.push_back(std::move(out));
+
+        next_us = ((cur_us / step_us) + 1) * step_us;
+        return 0;
+    };
+
+    while ((ret = av_read_frame(inFmt, inPkt)) >= 0) {
+        if (inPkt->stream_index != videoStream) {
+            av_packet_unref(inPkt);
+            continue;
+        }
+
+        ret = avcodec_send_packet(decCtx, inPkt);
+        av_packet_unref(inPkt);
+        if (ret < 0) return cleanup(ret);
+
+        while (true) {
+            ret = avcodec_receive_frame(decCtx, inFrame);
+            if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
+                ret = 0;
+                break;
+            }
+            if (ret < 0) return cleanup(ret);
+
+            ret = push_frame_if_needed(inFrame);
+            av_frame_unref(inFrame);
+            if (ret < 0) return cleanup(ret);
+        }
+    }
+
+    if (ret == AVERROR_EOF) ret = 0;
+    if (ret < 0) return cleanup(ret);
+
+    ret = avcodec_send_packet(decCtx, nullptr);
+    if (ret < 0) return cleanup(ret);
+
+    while (true) {
+        ret = avcodec_receive_frame(decCtx, inFrame);
+        if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
+            ret = 0;
+            break;
+        }
+        if (ret < 0) return cleanup(ret);
+
+        ret = push_frame_if_needed(inFrame);
+        av_frame_unref(inFrame);
+        if (ret < 0) return cleanup(ret);
+    }
+
+    return cleanup(0);
+}
+
 int video_strat(ai_translation_parmas& atp, output_params& out, pipeline_buffer& buffer) {
     std::vector<float>& pcm = buffer.pcm_mono_16k;
+    std::vector<OcrFrame>& ocr = buffer.ocr_frames;
 
     if (atp.video_path.empty()) {
         std::cerr << "video path is empty" << std::endl;
@@ -139,9 +292,15 @@ int video_strat(ai_translation_parmas& atp, output_params& out, pipeline_buffer&
     }
 
     out.video_mkv_path = atp.video_path;
-    out.audio_mka_path.clear();
+    // out.audio_mka_path.clear();
 
-    int ret = video_extract_audio_pcm_16k(atp.video_path, pcm);
+    int ret;
+    if(atp.use_ocr){
+        ret = video_extract_picture(atp.video_path, ocr);
+    } else {
+        ret = video_extract_audio_pcm_16k(atp.video_path, pcm);
+    }
+
     if (ret < 0) {
         std::cerr << "extract pcm failed: " << fferr(ret) << std::endl;
         return -1;

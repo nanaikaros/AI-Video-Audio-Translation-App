@@ -65,8 +65,8 @@ static std::string send_to_model(
     }
 
     if(is_background || n_predict <= 0){
-        if (llama_decode(ctx, batch)) return "";
-        return "";
+        if (!llama_decode(ctx, batch)) return "";
+        else return "";
     }
 
     std::string out;
