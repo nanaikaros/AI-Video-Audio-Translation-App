@@ -90,7 +90,8 @@ bool llama_batch_allocr::init(
     if (!batch.pos) {
         pos.resize(batch.n_tokens);
 
-        // initialize the starting position for each sequence based on the positions in the memory
+        // initialize the starting position for each sequence based on 
+        // the positions in the memory
         llama_pos p0[LLAMA_MAX_SEQ];
         for (uint32_t s = 0; s < n_seq_max; ++s) {
             if (!memory) {
@@ -181,7 +182,8 @@ bool llama_batch_allocr::init(
         }
     }
 
-    // precompute the sequence sets for each token and determine the unique sequence ids that participate in the batch
+    // precompute the sequence sets for each token and 
+    // determine the unique sequence ids that participate in the batch
     {
         seq_set_t seq_set_unq;
 

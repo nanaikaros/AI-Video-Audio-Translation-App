@@ -73,6 +73,7 @@ static std::string send_to_model(
     int n_decode = 0;
 
     while (n_decode < n_predict) {
+        // forward
         if (llama_decode(ctx, batch)) {
             break;
         }
