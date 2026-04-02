@@ -4,6 +4,7 @@
 #include "whisper_bridge.h"
 #include "include/params.h"
 #include "include/progress_ipc.h"
+#include "include/ocr_main.h"
 
 #include <vector>
 #include <string>
@@ -60,7 +61,10 @@ int main(int argc, char ** argv){
 
     if(atp.use_ocr){
         // ocr
-        
+        ret = ocr_start(atp, out_params, buffer);
+        if(ret != 0){
+            return -1;
+        }
     } else {
         // whisper
         progress_ipc_send_stage("whisper", "running");

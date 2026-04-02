@@ -2,6 +2,9 @@
 #include <string>
 #include <vector>
 
+#include <absl/types/optional.h>
+#include <opencv2/opencv.hpp>
+
 /**
  * srt结构体
  * 索引 时间戳 文本
@@ -10,6 +13,8 @@ struct SubtitlesEntry {
     int index = 0;
     std::string timecode;
     std::string text;
+    absl::optional<std::pair<float, float>> p1 = absl::nullopt; // 对角线 {x, y}
+    absl::optional<std::pair<float, float>> p2 = absl::nullopt;
 };
 
 struct ai_translation_parmas {
@@ -32,12 +37,13 @@ struct OcrFrame {
     int linesize = 0;         // rgb byte row
     int64_t ts_ms = 0;        
     std::vector<uint8_t> rgb; // linesize * height
+    cv::Mat mat;
 };
 
 struct pipeline_buffer {
     std::vector<float> pcm_mono_16k;   
-    std::vector<SubtitlesEntry> asr_entries;
-    std::vector<SubtitlesEntry> subtitles_entries;
+    std::vector<SubtitlesEntry> asr_entries; // 待翻译
+    std::vector<SubtitlesEntry> subtitles_entries; // 翻译后
     std::vector<OcrFrame> ocr_frames;
 };
 

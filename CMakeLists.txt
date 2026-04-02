@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.14)
 project(AIVideoTranslationApp)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -10,6 +10,7 @@ option(USE_SYSTEM_GGML "Use system-installed GGML library" OFF)
 set(GGML_SRC_DIR    ${CMAKE_CURRENT_SOURCE_DIR}/ggml)
 set(WHISPER_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/whisper)
 set(LLAMA_SRC_DIR   ${CMAKE_CURRENT_SOURCE_DIR}/src/llama)
+set(PADDLE_SRC_DIR  ${CMAKE_CURRENT_SOURCE_DIR}/src/paddle)
 
 set(WHISPER_USE_SYSTEM_GGML ON CACHE BOOL "" FORCE)
 set(LLAMA_USE_SYSTEM_GGML   ON CACHE BOOL "" FORCE)
@@ -37,19 +38,28 @@ if(WIN32)
     target_compile_definitions(ggml-base PRIVATE _DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR)
 endif()
 
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/paddle)
+
+SET(PADDLE_LIB "${CMAKE_CURRENT_SOURCE_DIR}/src/paddle/paddle_inference")
+link_directories("${PADDLE_LIB}/third_party/install/protobuf/lib")
+link_directories("${PADDLE_LIB}/third_party/install/glog/lib")
+link_directories("${PADDLE_LIB}/third_party/install/gflags/lib")
+link_directories("${PADDLE_LIB}/third_party/install/xxhash/lib")
+link_directories("${PADDLE_LIB}/third_party/install/yaml-cpp/lib")
+link_directories("${PADDLE_LIB}/paddle/lib")
+
+add_subdirectory(${PADDLE_SRC_DIR} paddle_build) 
 add_subdirectory(${WHISPER_SRC_DIR} whisper_build)
 add_subdirectory(${LLAMA_SRC_DIR} llama_build)
+
 
 add_executable(my_app
     src/translation/translation.cpp
     src/video/video.cpp
     src/whisper/whisper_bridge.cpp
+    src/paddle/ocr_main.cpp
     common/progress_ipc.cpp
     main.cpp
-)
-
-target_include_directories(my_app PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
 if(WIN32)
@@ -65,15 +75,32 @@ if(WIN32)
   set_target_properties(llama   PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 endif()
 
+find_package(OpenMP)
+if(OpenMP_CXX_FOUND)
+  target_link_libraries(my_app PRIVATE OpenMP::OpenMP_CXX)
+endif()
 
 target_link_libraries(my_app PRIVATE 
   llama
   whisper
+  paddle
+  glog
+  gflags
+  xxhash
+  yaml-cpp
+  paddle_inference
+  phi
+  phi_core
+  common
 )
 
 # vcpkg
 find_package(FFMPEG REQUIRED)
-target_include_directories(my_app PRIVATE ${FFMPEG_INCLUDE_DIRS})
+target_include_directories(my_app PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${FFMPEG_INCLUDE_DIRS}
+)
+
 if(WIN32)
   target_link_libraries(my_app PRIVATE Ws2_32 ${FFMPEG_LIBRARIES})
 elseif(APPLE)

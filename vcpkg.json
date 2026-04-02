@@ -1,5 +1,7 @@
 {
   "dependencies": [
-    "ffmpeg"
+    "ffmpeg",
+    "opencv4",
+    "openblas"
   ]
 }

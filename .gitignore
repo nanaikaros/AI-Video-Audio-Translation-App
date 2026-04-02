@@ -15,3 +15,5 @@ electron/dist/
 # vcpkg build artifacts
 CMakeUserPresets.json
 /vcpkg_installed/
+
+src/paddle/third_party/

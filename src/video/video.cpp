@@ -133,7 +133,7 @@ end:
 }
 
 
-int video_extract_picture(const std::string& in_video, std::vector<OcrFrame>& frames_out, int interval_sec) {
+int video_extract_picture(const std::string& in_video, std::vector<OcrFrame>& frames_out, double interval_sec) {
     frames_out.clear();
 
     AVFormatContext* inFmt = nullptr;
@@ -184,6 +184,7 @@ int video_extract_picture(const std::string& in_video, std::vector<OcrFrame>& fr
     if (!inFrame || !inPkt) return cleanup(AVERROR(ENOMEM));
 
     AVRational tb = inFmt->streams[videoStream]->time_base;
+    // 1sec extract one frame
     const int64_t step_us = (int64_t)interval_sec * 1000000LL;
     int64_t next_us = 0;
 
@@ -210,7 +211,7 @@ int video_extract_picture(const std::string& in_video, std::vector<OcrFrame>& fr
 
         int rgb_linesize = out.width * 3;
         out.rgb.resize((size_t)rgb_linesize * (size_t)out.height);
-
+        
         uint8_t* dst_data[4] = { nullptr, nullptr, nullptr, nullptr };
         int dst_linesize[4] = { 0, 0, 0, 0 };
 
@@ -229,6 +230,7 @@ int video_extract_picture(const std::string& in_video, std::vector<OcrFrame>& fr
             dst_data, dst_linesize
         );
 
+        out.mat = cv::Mat(frm->height, frm->width, CV_8UC3, out.rgb.data());
         out.linesize = dst_linesize[0];
         frames_out.push_back(std::move(out));
 
@@ -296,19 +298,29 @@ int video_strat(ai_translation_parmas& atp, output_params& out, pipeline_buffer&
 
     int ret;
     if(atp.use_ocr){
-        ret = video_extract_picture(atp.video_path, ocr);
+        ret = video_extract_picture(atp.video_path, ocr, 0.5);
+
+        if (ret < 0) {
+            std::cerr << "extract picture failed: " << fferr(ret) << std::endl;
+            return -1;
+        }
+
+        if (ocr.empty()) {
+            std::cerr << "extract picture empty" << std::endl;
+            return -1;
+        }
     } else {
         ret = video_extract_audio_pcm_16k(atp.video_path, pcm);
-    }
+    
+        if (ret < 0) {
+            std::cerr << "extract pcm failed: " << fferr(ret) << std::endl;
+            return -1;
+        }
 
-    if (ret < 0) {
-        std::cerr << "extract pcm failed: " << fferr(ret) << std::endl;
-        return -1;
-    }
-
-    if (pcm.empty()) {
-        std::cerr << "extract pcm empty" << std::endl;
-        return -1;
+        if (pcm.empty()) {
+            std::cerr << "extract pcm empty" << std::endl;
+            return -1;
+        }
     }
 
     return 0;
@@ -400,6 +412,7 @@ static int write_ass_from_entry(AVFormatContext* ofmt, int s_out_idx, const ASSD
 
     // Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     static int read_order = 0;
+
     std::string payload = std::to_string(read_order++) + ",0,Default,,0,0,0,," + text;
     AVPacket* pkt = av_packet_alloc();
     if (!pkt) return AVERROR(ENOMEM);
@@ -426,7 +439,8 @@ static int write_ass_from_entry(AVFormatContext* ofmt, int s_out_idx, const ASSD
     return ret;
 }
 
-std::vector<ASSDialog> srt_to_ass(std::vector<SubtitlesEntry>& entry){
+// todo: delete this function change timecode
+std::vector<ASSDialog> srt_to_ass(std::vector<SubtitlesEntry>& entry, int width, int height){
     int n = entry.size();
     std::vector<ASSDialog> ass;
     ass.reserve(n);
@@ -444,6 +458,29 @@ std::vector<ASSDialog> srt_to_ass(std::vector<SubtitlesEntry>& entry){
         d.end = t1;
         
         d.text = const_cast<char *>(entry[i].text.c_str());
+
+        if (entry[i].p1.has_value()) {
+            int left = static_cast<int>(std::min(entry[i].p1->first, entry[i].p2->first));
+            int top = static_cast<int>(std::min(entry[i].p1->second, entry[i].p2->second));
+            int right = static_cast<int>(std::max(entry[i].p1->first, entry[i].p2->first));
+            int bottom = static_cast<int>(std::max(entry[i].p1->second, entry[i].p2->second));
+
+            left = std::clamp(left, 0, width - 1);
+            top = std::clamp(top, 0, height - 1);
+            right = std::clamp(right, 0, width - 1);
+            bottom = std::clamp(bottom, 0, height - 1);
+
+            int box_h = std::max(1, bottom - top);
+            int font_size = std::clamp(static_cast<int>(std::lround(box_h * 0.9)), 18, 72);
+
+            int x = std::clamp((left + right) / 2, 0, width - 1);
+            int y = std::clamp(top - font_size - 4, 0, height - 1);
+
+            entry[i].text = "{\\an8\\pos(" + std::to_string(x) + "," +
+                            std::to_string(y) + ")\\fs" + std::to_string(font_size) + "}" +
+                            entry[i].text;
+            d.text = const_cast<char*>(entry[i].text.c_str());
+        }
         ass.push_back(d);
     }
 
@@ -505,27 +542,35 @@ int mux_video_with_ass_api(const char* video_path, pipeline_buffer& buffer, cons
     std::vector<int> vmap;
     int subtitle_idx = -1;
     int entries_idx = 0;
-
     int copied_av_streams = 0;
     int64_t written_av_packets = 0;
 
     int64_t last_pts = AV_NOPTS_VALUE;
 
-    // subtitles gen
-    const std::vector<ASSDialog>& entries = srt_to_ass(buffer.subtitles_entries);
+    if (!video_path || !out_video_path) return AVERROR(EINVAL);
+    if ((ret = avformat_open_input(&vfmt, video_path, nullptr, nullptr)) < 0) return AVERROR(EINVAL);
+    if ((ret = avformat_find_stream_info(vfmt, nullptr)) < 0) return AVERROR(EINVAL);
+
+    for (unsigned i = 0; i < vfmt->nb_streams; ++i) {
+        AVStream* in_st = vfmt->streams[i];
+        if (in_st->codecpar->codec_type == AVMEDIA_TYPE_VIDEO &&
+            in_st->codecpar->width > 0 && in_st->codecpar->height > 0) {
+            width = in_st->codecpar->width;
+            height = in_st->codecpar->height;
+            break;
+        }
+    }
+
+    // subtitles
+    const std::vector<ASSDialog>& entries = srt_to_ass(buffer.subtitles_entries, width, height);
     if (entries.empty()) {
         std::cerr << "[mux] no subtitle entries\n";
         return AVERROR(EINVAL);
     }
 
-    if (!video_path || !out_video_path) return AVERROR(EINVAL);
-
-    if ((ret = avformat_open_input(&vfmt, video_path, nullptr, nullptr)) < 0) goto end;
-    if ((ret = avformat_find_stream_info(vfmt, nullptr)) < 0) goto end;
-
     if ((ret = avformat_alloc_output_context2(&ofmt, nullptr, "matroska", out_video_path)) < 0) 
         goto end;
-    
+
     vmap.assign(vfmt->nb_streams, -1);
     for (unsigned i = 0; i < vfmt->nb_streams; ++i) {
         AVStream* in_st = vfmt->streams[i];

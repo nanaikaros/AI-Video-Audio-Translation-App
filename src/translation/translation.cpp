@@ -13,6 +13,49 @@ static std::string trim_copy(std::string s) {
     return s;
 }
 
+static std::string clean_translation(std::string out, const std::string &src) {
+    auto to_lower = [](std::string s) {
+        for (char &c : s) c = (char)std::tolower((unsigned char)c);
+        return s;
+    };
+    // 去掉换行，强制单行
+    for (char &c : out) {
+        if (c == '\r' || c == '\n' || c == '\t') c = ' ';
+    }
+
+    out = trim_copy(out);
+
+    // 删除常见前缀标签
+    const std::vector<std::string> prefixes = {
+        "Input:", "Output:", "Translation:", "翻译：", "输出："
+    };
+    bool removed = true;
+    while (removed) {
+        removed = false;
+        for (const auto &p : prefixes) {
+            if (out.rfind(p, 0) == 0) {
+                out = trim_copy(out.substr(p.size()));
+                removed = true;
+            }
+        }
+    }
+
+    if (out.empty()) return "";
+    if (to_lower(out) == "empty") return "";
+
+    std::string low = to_lower(out);
+    if (low.find("input") != std::string::npos) return "";
+    if (low.find("output") != std::string::npos) return "";
+    if (low.find("translation") != std::string::npos) return "";
+    if (out.find("翻译") != std::string::npos) return "";
+    if (out.find("输出") != std::string::npos) return "";
+
+    // 没翻译出来，原样返回了
+    if (trim_copy(out) == trim_copy(src)) return "";
+
+    return out;
+}
+
 static std::string send_to_model(
     llama_model * model,
     llama_context * ctx,
@@ -161,7 +204,7 @@ int translation_start(ai_translation_parmas& atp, pipeline_buffer& buffer) {
     for (int t = 0; t < workers; ++t) {
         pool.emplace_back([&]() {
             llama_context_params lc = llama_context_default_params();
-            lc.n_ctx = 1024;
+            lc.n_ctx = 2048;
             lc.n_batch = 512;
             lc.n_threads = std::max(2u, hw / 2);
 
@@ -181,12 +224,11 @@ int translation_start(ai_translation_parmas& atp, pipeline_buffer& buffer) {
                 size_t i = next.fetch_add(1);
                 if (i >= entries.size()) break;
                 if (!entries[i].text.empty()) {
-                    std::string temp = send_to_model(model, tctx, tsmpl, tvocab, entries[i].text, false, n_predict);
-                    entries[i].text = temp;
+                    std::string trans = send_to_model(model, tctx, tsmpl, tvocab, entries[i].text, false, n_predict);
+                    entries[i].text = trans;
                 }
                 done.fetch_add(1, std::memory_order_relaxed);
             }
-
             llama_sampler_free(tsmpl);
             llama_free(tctx);
         });

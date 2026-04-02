@@ -1,5 +1,5 @@
 #pragma once
-#include "../include/params.h"
+#include "params.h"
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -13,6 +13,7 @@ extern "C" {
 
 #include <iostream>
 #include <string>
+#include <opencv2/opencv.hpp>
 
 int video_strat(ai_translation_parmas&, output_params&, pipeline_buffer&);
 int mux_video_with_ass_api(const char* video_path, pipeline_buffer&, 
