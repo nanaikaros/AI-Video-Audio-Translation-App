@@ -197,6 +197,11 @@ ipcMain.handle('run-cpp-pipeline', async (event, payload) => {
             }
             if (p >= 100) emitStage('translation', 'done');
             mainWindow.setProgressBar((lastTranslation + 100) / 200);
+          } else if (msg.stage === 'ocr') {
+            emitStage('ocr', 'running');
+            const p = Number(msg.progress) || 0;
+            emitProgress('ocr', p);
+            if (p >= 100) emitStage('ocr', 'done');
           } else if (msg.stage === 'done') {
             mainWindow.setProgressBar(-1);
             gotDoneStage = true;
@@ -222,6 +227,10 @@ ipcMain.handle('run-cpp-pipeline', async (event, payload) => {
       '--output', payload.outputPath || '',
       '--progress-sock', sockPath,
     ];
+
+    if (payload.ocrEnabled) {
+      args.push('--ocr');
+    }
 
     log.info(`[run] cmd=${bin} ${args.join(' ')}`);
     const child = spawn(bin, args, { cwd: runBase, stdio: ['ignore', 'pipe', 'pipe'] });

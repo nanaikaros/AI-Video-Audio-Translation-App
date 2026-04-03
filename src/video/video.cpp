@@ -185,7 +185,8 @@ int video_extract_picture(const std::string& in_video, std::vector<OcrFrame>& fr
 
     AVRational tb = inFmt->streams[videoStream]->time_base;
     // 1sec extract one frame
-    const int64_t step_us = (int64_t)interval_sec * 1000000LL;
+    int64_t step_us = static_cast<int64_t>(interval_sec * 1000000.0);
+    if (step_us <= 0) step_us = 1;
     int64_t next_us = 0;
 
     auto push_frame_if_needed = [&](AVFrame* frm) -> int {
@@ -298,7 +299,7 @@ int video_strat(ai_translation_parmas& atp, output_params& out, pipeline_buffer&
 
     int ret;
     if(atp.use_ocr){
-        ret = video_extract_picture(atp.video_path, ocr, 0.5);
+        ret = video_extract_picture(atp.video_path, ocr, atp.sample_time);
 
         if (ret < 0) {
             std::cerr << "extract picture failed: " << fferr(ret) << std::endl;

@@ -4,14 +4,53 @@ window.addEventListener('DOMContentLoaded', () => {
   const state = { videoPath: '', outputPath: '' };
 
   let isRunning = false;
+  let progressMode = 'whisper';
 
   const runBtn = $('run');
   const whisperBar = $('whisperProgressBar');
   const whisperText = $('whisperProgressText');
   const translationBar = $('translationProgressBar');
   const translationText = $('translationProgressText');
+  const ocrModeBtn = $('ocrModeBtn');
+  const whisperLabel = $('whisperProgressLabel');
+  const whisperStep = $('whisperStep');
+  const whisperModelInput = $('whisperModel');
+  const pickWhisperBtn = $('pickWhisper');
+
   // max stage progress
   const stageMax = { whisper: 0, translation: 0 };
+
+  const syncWhisperModelState = () => {
+    const disableWhisper = progressMode === 'ocr';
+
+    if (whisperModelInput) {
+      whisperModelInput.disabled = disableWhisper;
+      whisperModelInput.placeholder = disableWhisper
+        ? 'OCR模式下无需Whisper模型'
+        : '输入whisper语音模型路径（.bin）';
+    }
+
+    if (pickWhisperBtn) {
+      pickWhisperBtn.disabled = disableWhisper;
+    }
+  };
+
+
+  const syncWhisperLabel = () => {
+    if (whisperLabel) {
+      whisperLabel.textContent =
+      progressMode === 'ocr' ? 'OCR 识别进度' : 'Whisper 识别进度';
+    }
+    if (ocrModeBtn) {
+      ocrModeBtn.textContent = progressMode === 'ocr' ? 'OCR：开' : 'OCR';
+    } 
+    ocrModeBtn?.classList.toggle('is-on', progressMode === 'ocr');
+    if (whisperStep) {
+      whisperStep.textContent = progressMode === 'ocr' ? 'OCR 识别' : '语音识别';
+    }
+  };
+  syncWhisperLabel();
+  syncWhisperModelState();
 
   const setRunButtonState = (running) => {
     if (!runBtn) return;
@@ -90,6 +129,13 @@ window.addEventListener('DOMContentLoaded', () => {
     $('outputPath').value = p;
   });
 
+  ocrModeBtn?.addEventListener('click', () => {
+    if (isRunning) return;
+    progressMode = progressMode === 'whisper' ? 'ocr' : 'whisper';
+    syncWhisperLabel();
+    syncWhisperModelState();
+  });
+
   // drag and drop video file
   const dz = $('dropZone');
   dz?.addEventListener('dragover', (e) => {
@@ -128,6 +174,7 @@ window.addEventListener('DOMContentLoaded', () => {
         whisperModel: $('whisperModel')?.value?.trim() || '',
         translationModel: $('translationModel')?.value?.trim() || '',
         threads: Number($('threads')?.value || 4),
+        ocrEnabled: progressMode === 'ocr',
       });
 
       if (ret?.code === 0) {
@@ -171,6 +218,9 @@ window.addEventListener('DOMContentLoaded', () => {
         } else if (stage === 'translation') {
           setStep('translation', 'running');
           setStageProgress('translation', p);
+        } else if (stage === 'ocr') {
+          setStep('whisper', 'running');
+          setStageProgress('whisper', p);
         } else if (stage === 'done') {
           setStageProgress('whisper', 100);
           setStageProgress('translation', 100);

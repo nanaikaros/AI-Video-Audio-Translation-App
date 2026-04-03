@@ -21,4 +21,4 @@ int mux_video_with_ass_api(const char* video_path, pipeline_buffer&,
 
 int video_extract_picture(const std::string& in_video,
                           std::vector<OcrFrame>& frames_out,
-                          int interval_sec = 1);
+                          double interval_sec = 1);

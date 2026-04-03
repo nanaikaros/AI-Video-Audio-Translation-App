@@ -128,6 +128,8 @@ button.primary {
   margin-top: 14px;
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
 }
 
 .content {
@@ -366,4 +368,24 @@ button.primary {
 
 .is-hidden {
   display: none !important;
+}
+
+#ocrModeBtn {
+  min-width: 92px;
+  border: 1px solid rgba(125, 147, 214, 0.42);
+  background: linear-gradient(180deg, rgba(34, 45, 84, 0.95), rgba(23, 31, 59, 0.95));
+  color: #cfd9ff;
+  box-shadow: none;
+}
+
+#ocrModeBtn:hover {
+  border-color: rgba(141, 167, 255, 0.75);
+  filter: brightness(1.08);
+}
+
+#ocrModeBtn.is-on {
+  border-color: rgba(47, 211, 139, 0.75);
+  background: linear-gradient(180deg, rgba(47, 211, 139, 0.25), rgba(22, 53, 41, 0.85));
+  color: #d8ffe9;
+  box-shadow: 0 0 0 3px rgba(47, 211, 139, 0.14);
 }

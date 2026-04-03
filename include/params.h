@@ -29,6 +29,7 @@ struct ai_translation_parmas {
     std::string progress_sock_path;
 
     bool use_ocr = false;
+    double sample_time;
 };
 
 struct OcrFrame {

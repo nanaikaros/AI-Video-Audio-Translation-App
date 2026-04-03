@@ -21,7 +21,7 @@ static int params_parse(int argc, char ** argv, ai_translation_parmas& atp){
         else if ((arg == "--threads" || arg == "-t") && i + 1 < argc) atp.thread_num = std::stoi(argv[++i]);
         else if ((arg == "--output" || arg == "-o") && i + 1 < argc) atp.output_video_path = argv[++i];
         else if (arg == "--progress-sock" && i + 1 < argc) atp.progress_sock_path = argv[++i];
-        else if (arg == "--ocr") atp.use_ocr = true;
+        else if (arg == "--ocr") { atp.use_ocr = true; atp.sample_time = 0.5f; }
         else {
             fprintf(stderr, "error: unknown argument: %s\n", arg.c_str());
             return -1;
@@ -29,7 +29,7 @@ static int params_parse(int argc, char ** argv, ai_translation_parmas& atp){
     }
 
     if (atp.video_path.empty()) return -2;
-    if (atp.whisper_model_path.empty()) return -3;
+    if (atp.whisper_model_path.empty() && !atp.use_ocr) return -3;
     if (atp.translation_model_path.empty()) return -4;
     return 0;
 }
@@ -61,10 +61,13 @@ int main(int argc, char ** argv){
 
     if(atp.use_ocr){
         // ocr
+        progress_ipc_send_stage("ocr", "running");
         ret = ocr_start(atp, out_params, buffer);
         if(ret != 0){
+            progress_ipc_send_stage("ocr", "error");
             return -1;
         }
+        progress_ipc_send_stage("ocr", "done");
     } else {
         // whisper
         progress_ipc_send_stage("whisper", "running");

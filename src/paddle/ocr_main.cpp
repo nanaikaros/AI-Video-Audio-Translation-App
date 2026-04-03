@@ -29,41 +29,61 @@ int ocr_start(ai_translation_parmas& atp, output_params& out_params,
     
     auto infer = My_PaddleOCR(params);
 
-    // PaddleOCR Predict -> pipeline_infer_ Predict(input) -> infer_ Predict;
-    // auto outputs = infer.Predict("/Users/wang/code/test/models/general_ocr_002.png");
-
-    std::vector<cv::Mat> mat;
-    // mat.resize(n);
-
-    for(int i = 0; i < n; ++i){
-      mat.push_back(buffer.ocr_frames[i].mat);
+    if (n <= 0) {
+      progress_ipc_send("ocr", 100);
+      return 0;
     }
-    auto outputs = infer.Predict(mat);
+
+    const int batch_size = 4;
+    const int progress_den = (n > 0) ? n : 1;
+
+    for (int batch_start = 0; batch_start < n; batch_start += batch_size) {
+      int batch_end = batch_start + batch_size;
+      if (batch_end > n) batch_end = n;
+
+      std::vector<cv::Mat> batch_mat;
+      batch_mat.reserve(batch_end - batch_start);
+      for (int i = batch_start; i < batch_end; ++i) {
+      batch_mat.emplace_back(buffer.ocr_frames[i].mat);
+    }
+
+    auto outputs = infer.Predict(batch_mat);
+
+    int loop_count = static_cast<int>(outputs.size());
+    int frame_count = batch_end - batch_start;
+    if (loop_count > frame_count) loop_count = frame_count;
     
-    for (int j = 0; j < outputs.size(); ++j) {
-      auto& output = outputs[j];
+    for (int local = 0; local < loop_count; ++local) {
+      int j = batch_start + local;
+      auto& output = outputs[local];
       OCRResult* result = dynamic_cast<OCRResult*>(output.get());
-      if(result == nullptr) continue;
-      OCRPipelineResult pipeline_result = result->GetPipelineResult();
-      if(pipeline_result.rec_texts.size() == 0) continue;
-      
-      int64_t t0 = buffer.ocr_frames[j].ts_ms;
-      for(int i = 0; i < pipeline_result.rec_texts.size(); ++i){
-        SubtitlesEntry e;
-        e.index = j;
-        int t1 = (j + 1 < n) ? buffer.ocr_frames[j + 1].ts_ms : (t0 + 1000);
-        e.timecode = to_timestamp(t0, true) + " --> " + to_timestamp(t1, true);
-        e.text = pipeline_result.rec_texts[i];
-        if (i >= pipeline_result.rec_boxes.size()) continue;
-        auto& p = pipeline_result.rec_boxes[i];
-        e.p1 = std::make_pair(p[0], p[1]);
-        e.p2 = std::make_pair(p[2], p[3]);
-        subtitle.emplace_back(std::move(e));
+      if (result != nullptr) {
+        OCRPipelineResult pipeline_result = result->GetPipelineResult();
+
+        if (!pipeline_result.rec_texts.empty()) {
+          int64_t t0 = buffer.ocr_frames[j].ts_ms;
+          int64_t t1 = (j + 1 < n)
+            ? buffer.ocr_frames[j + 1].ts_ms
+            : (t0 + atp.sample_time * 1000);
+
+          for (int i = 0; i < static_cast<int>(pipeline_result.rec_texts.size()); ++i) {
+            if (i >= static_cast<int>(pipeline_result.rec_boxes.size())) continue;
+
+            SubtitlesEntry e;
+            e.index = j;
+            e.timecode = to_timestamp(t0, true) + " --> " + to_timestamp(t1, true);
+            e.text = pipeline_result.rec_texts[i];
+
+            auto& p = pipeline_result.rec_boxes[i];
+            e.p1 = std::make_pair(p[0], p[1]);
+            e.p2 = std::make_pair(p[2], p[3]);
+
+            subtitle.emplace_back(std::move(e));
+          }
+        }
       }
+      progress_ipc_send("ocr", static_cast<int>((j + 1) * 100.0 / progress_den));
     }
-
-    // debug
-    int a = 0;
-
+  }
     return 0;
 }

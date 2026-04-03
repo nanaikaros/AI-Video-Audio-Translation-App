@@ -33,6 +33,7 @@
       <input id="threads" type="number" min="1" value="4" />
 
       <div class="actions">
+        <button id="ocrModeBtn" type="button">OCR</button>
         <button id="run" class="primary">开始处理</button>
       </div>
 
@@ -53,7 +54,7 @@
         <div class="stepper" id="stepper">
           <div class="step is-running" data-step="prepare">准备</div>
           <div class="step" data-step="video">视频处理</div>
-          <div class="step" data-step="whisper">语音识别</div>
+          <div class="step" data-step="whisper" id="whisperStep">语音识别</div>
           <div class="step" data-step="translation">AI翻译</div>
           <div class="step" data-step="done">完成</div>
         </div>
@@ -62,7 +63,7 @@
 
         <div class="progress-group">
           <div class="progress-head">
-            <span>Whisper 识别进度</span>
+            <span id="whisperProgressLabel">Whisper 识别进度</span>
             <span id="whisperProgressText">0%</span>
           </div>
           <div class="progress-track">
