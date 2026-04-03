@@ -17,3 +17,5 @@ CMakeUserPresets.json
 /vcpkg_installed/
 
 src/paddle/third_party/
+
+src/paddle/paddle_inference/
