@@ -152,7 +152,7 @@ int video_extract_picture(const std::string& in_video, std::vector<OcrFrame>& fr
         return code;
     };
 
-    if (interval_sec <= 0) interval_sec = 1;
+    // if (interval_sec <= 0) interval_sec = 1;
 
     int ret = avformat_open_input(&inFmt, in_video.c_str(), nullptr, nullptr);
     if (ret < 0) return cleanup(ret);
@@ -185,8 +185,11 @@ int video_extract_picture(const std::string& in_video, std::vector<OcrFrame>& fr
 
     AVRational tb = inFmt->streams[videoStream]->time_base;
     // 1sec extract one frame
-    int64_t step_us = static_cast<int64_t>(interval_sec * 1000000.0);
-    if (step_us <= 0) step_us = 1;
+    const bool extract_all_frames = (interval_sec <= 0.0);
+    int64_t step_us = extract_all_frames
+        ? 0
+        : static_cast<int64_t>(interval_sec * 1000000.0);
+    if (!extract_all_frames && step_us <= 0) step_us = 1;
     int64_t next_us = 0;
 
     auto push_frame_if_needed = [&](AVFrame* frm) -> int {
@@ -194,7 +197,7 @@ int video_extract_picture(const std::string& in_video, std::vector<OcrFrame>& fr
         if (ts == AV_NOPTS_VALUE) return 0;
 
         int64_t cur_us = av_rescale_q(ts, tb, AVRational{1, 1000000});
-        if (cur_us < next_us) return 0;
+        if (!extract_all_frames && cur_us < next_us) return 0;
 
         if (!sws) {
             sws = sws_getContext(
@@ -235,7 +238,9 @@ int video_extract_picture(const std::string& in_video, std::vector<OcrFrame>& fr
         out.linesize = dst_linesize[0];
         frames_out.push_back(std::move(out));
 
-        next_us = ((cur_us / step_us) + 1) * step_us;
+        if (!extract_all_frames) {
+            next_us = ((cur_us / step_us) + 1) * step_us;
+        }
         return 0;
     };
 
@@ -299,7 +304,8 @@ int video_strat(ai_translation_parmas& atp, output_params& out, pipeline_buffer&
 
     int ret;
     if(atp.use_ocr){
-        ret = video_extract_picture(atp.video_path, ocr, atp.sample_time);
+        const double ocr_interval = atp.ocr_all_frames ? 0.0 : atp.sample_time;
+        ret = video_extract_picture(atp.video_path, ocr, ocr_interval);
 
         if (ret < 0) {
             std::cerr << "extract picture failed: " << fferr(ret) << std::endl;
@@ -335,7 +341,7 @@ int video_strat(ai_translation_parmas& atp, output_params& out, pipeline_buffer&
  * @param t0_ms start
  * @param t1_ms end
  * 
- * @return centiseconds
+ * @return t0_cs t1_cs
  */
 static bool parse_ass_timecode_ms(const std::string& tc, int64_t& t0_cs, int64_t& t1_cs) {
     auto trim = [](const std::string& s) -> std::string {

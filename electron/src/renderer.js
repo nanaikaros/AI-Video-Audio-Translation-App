@@ -173,7 +173,7 @@ window.addEventListener('DOMContentLoaded', () => {
         outputPath: $('outputPath')?.value?.trim() || state.outputPath || '',
         whisperModel: $('whisperModel')?.value?.trim() || '',
         translationModel: $('translationModel')?.value?.trim() || '',
-        threads: Number($('threads')?.value || 4),
+        threads: Number($('threads')?.value || 2),
         ocrEnabled: progressMode === 'ocr',
       });
 

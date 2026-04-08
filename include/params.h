@@ -15,6 +15,8 @@ struct SubtitlesEntry {
     std::string text;
     absl::optional<std::pair<float, float>> p1 = absl::nullopt; // 对角线 {x, y}
     absl::optional<std::pair<float, float>> p2 = absl::nullopt;
+    int64_t t0_cs;
+    int64_t t1_cs;
 };
 
 struct ai_translation_parmas {
@@ -29,7 +31,8 @@ struct ai_translation_parmas {
     std::string progress_sock_path;
 
     bool use_ocr = false;
-    double sample_time;
+    bool ocr_all_frames = false;   // full frame
+    double sample_time = 0.5;      // sample frame
 };
 
 struct OcrFrame {
