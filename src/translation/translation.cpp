@@ -23,7 +23,12 @@ static std::string clean_translation(std::string out) {
     out = trim_copy(out);
 
     // 只保留 Input 之前的部分，Input 及之后全部丢弃
-    const size_t pos = out.find("Input");
+    size_t pos = out.find("Input");
+    if (pos != std::string::npos) {
+        out = trim_copy(out.substr(0, pos));
+    }
+
+    pos = out.find("Terminology");
     if (pos != std::string::npos) {
         out = trim_copy(out.substr(0, pos));
     }
@@ -38,7 +43,8 @@ static std::string send_to_model(
     const llama_vocab * vocab,
     const std::string & sentances,
     bool is_background,
-    int n_predict
+    int n_predict,
+    const std::vector<glossary_pair> * glossary_hits
 ) {
     // llama_memory_clear(llama_get_memory(ctx), true);
 
@@ -55,7 +61,17 @@ static std::string send_to_model(
             "Keep meaning accurate, concise, and subtitle-friendly.\n"
             "Do not add labels, explanations, prefixes, or notes.\n";
     } else {
-        prompt = 
+        std::string glossary_block;
+        if (glossary_hits && !glossary_hits->empty()) {
+            glossary_block += "Terminology constraints (must follow):\n";
+            for (const auto & p : *glossary_hits) {
+                glossary_block += "- " + p.src + " => " + p.dst + "\n";
+            }
+            glossary_block += "\n";
+        }
+
+        prompt =
+            glossary_block +
             "Input:\n" + sentances + "\n"
             "Output:\n";
     }
@@ -115,6 +131,58 @@ static std::string send_to_model(
     return trim_copy(out);
 }
 
+static std::vector<glossary_pair> collect_glossary_hits(
+    const std::vector<glossary_pair> & glossary,
+    const std::string & text,
+    size_t max_hits = 12
+) {
+    std::vector<glossary_pair> hits;
+    hits.reserve(std::min(max_hits, glossary.size()));
+
+    for (const auto & g : glossary) {
+        if (g.src.empty()) continue;
+        if (text.find(g.src) != std::string::npos) {
+            hits.push_back(g);
+            if (hits.size() >= max_hits) break;
+        }
+    }
+    return hits;
+}
+
+static bool split_tsv_2cols(const std::string& line, std::string& a, std::string& b) {
+    const size_t p = line.find(';');
+    if (p == std::string::npos) return false;
+    a = trim_copy(line.substr(0, p));
+    b = trim_copy(line.substr(p + 1));
+    return !a.empty() && !b.empty();
+}
+
+static std::vector<glossary_pair> load_glossary_file(const std::string & path) {
+    std::vector<glossary_pair> out;
+    std::ifstream fin(path);
+    if (!fin.is_open()) return out;
+
+    std::string line;
+    while (std::getline(fin, line)) {
+        line = trim_copy(line);
+        if (line.empty()) continue;
+        if (!line.empty() && line[0] == '#') continue;
+
+        std::string src, dst;
+        if (!split_tsv_2cols(line, src, dst)) {
+            continue;
+        }
+
+        out.push_back({src, dst});
+    }
+    
+    std::sort(out.begin(), out.end(), [](const glossary_pair & x, const glossary_pair & y) {
+        return x.src.size() > y.src.size();
+    });
+
+    return out;
+}
+
 /**
  * translation entrance
  * 
@@ -142,6 +210,8 @@ int translation_start(ai_translation_parmas& atp, pipeline_buffer& buffer) {
     if(!print_log) {
         llama_log_set(cb_log_disable, NULL);
     }
+
+    const auto glossary = load_glossary_file("/Users/wang/code/test/src/rag/qwer");
 
     ggml_backend_load_all();
 
@@ -194,13 +264,14 @@ int translation_start(ai_translation_parmas& atp, pipeline_buffer& buffer) {
             const llama_vocab * tvocab = llama_model_get_vocab(model);
 
             // video background
-            send_to_model(model, tctx, tsmpl, tvocab, "", true, n_predict);
+            send_to_model(model, tctx, tsmpl, tvocab, "", true, n_predict, {});
 
             while (true) {
                 size_t i = next.fetch_add(1);
                 if (i >= entries.size()) break;
                 if (!entries[i].text.empty()) {
-                    std::string trans = send_to_model(model, tctx, tsmpl, tvocab, entries[i].text, false, n_predict);
+                    auto hits = collect_glossary_hits(glossary, entries[i].text, 12);
+                    std::string trans = send_to_model(model, tctx, tsmpl, tvocab, entries[i].text, false, n_predict, &hits);
                     entries[i].text = clean_translation(trans);
                 }
                 done.fetch_add(1, std::memory_order_relaxed);

@@ -57,3 +57,8 @@ struct output_params {
 
     std::string srt_path;
 };
+
+struct glossary_pair {
+    std::string src;
+    std::string dst;
+};

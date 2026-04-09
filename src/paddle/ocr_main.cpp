@@ -26,15 +26,63 @@ std::string normalize_text(std::string s) {
   return out;
 }
 
-bool same_region(const SubtitlesEntry& a, const SubtitlesEntry& b) {
-  if (!a.p1.has_value() || !a.p2.has_value() || !b.p1.has_value() || !b.p2.has_value()) return false;
-  float acx = (a.p1->first + a.p2->first) * 0.5f;
-  float acy = (a.p1->second + a.p2->second) * 0.5f;
-  float bcx = (b.p1->first + b.p2->first) * 0.5f;
-  float bcy = (b.p1->second + b.p2->second) * 0.5f;
-  float dx = std::abs(acx - bcx);
-  float dy = std::abs(acy - bcy);
-  return dx <= 30.0f && dy <= 20.0f;
+static std::unordered_map<std::string, int> build_ngram_hist(const std::string& s, size_t n) {
+  std::unordered_map<std::string, int> hist;
+  if (s.empty()) return hist;
+
+  if (s.size() < n) {
+    hist[s] = 1;
+    return hist;
+  }
+
+  for (size_t i = 0; i + n <= s.size(); ++i) {
+    ++hist[s.substr(i, n)];
+  }
+  return hist;
+}
+
+static double cosine_sim_hist(const std::unordered_map<std::string, int>& a, 
+    const std::unordered_map<std::string, int>& b) {
+  if (a.empty() || b.empty()) return 0.0;
+
+  double dot = 0.0;
+  double na = 0.0;
+  double nb = 0.0;
+
+  for (const auto& kv : a) {
+    const double va = static_cast<double>(kv.second);
+    na += va * va;
+    auto it = b.find(kv.first);
+    if (it != b.end()) {
+      dot += va * static_cast<double>(it->second);
+    }
+  }
+
+  for (const auto& kv : b) {
+    const double vb = static_cast<double>(kv.second);
+    nb += vb * vb;
+  }
+
+  if (na <= 1e-12 || nb <= 1e-12) return 0.0;
+  return dot / (std::sqrt(na) * std::sqrt(nb));
+}
+
+bool same_region(const std::string& a, const std::string& b) {
+  const std::string na = normalize_text(a);
+  const std::string nb = normalize_text(b);
+
+  if (na.empty() || nb.empty()) return false;
+  if (na == nb) return true;
+
+  const size_t max_len = std::max(na.size(), nb.size());
+  const size_t ngram_n = (max_len <= 6) ? 1 : 2; // 短文本更容易抖动
+  const double threshold = (max_len <= 6) ? 0.92 : 0.85;
+
+  const auto ha = build_ngram_hist(na, ngram_n);
+  const auto hb = build_ngram_hist(nb, ngram_n);
+
+  const double sim = cosine_sim_hist(ha, hb);
+  return sim >= threshold;
 };
 
 int ocr_start(ai_translation_parmas& atp, output_params& out_params, 
@@ -125,11 +173,13 @@ int ocr_start(ai_translation_parmas& atp, output_params& out_params,
             
             // 字幕合并
             bool merge = false;
-            const std::string e_norm = normalize_text(e.text);  
+            // const std::string e_norm = normalize_text(e.text);  
             for (int k = 0; k < (int)subtitle.size(); ++k) {
               if (subtitle[k].t1_cs + 50 < t0_cs) continue;
-              const std::string s_norm = normalize_text(subtitle[k].text);
-              if (e_norm == s_norm && same_region(subtitle[k], e)) {
+              // const std::string s_norm = normalize_text(subtitle[k].text);
+              if (same_region(subtitle[k].text, e.text) &&
+                  same_subtitle(subtitle[k].p1, e.p1) &&
+                  same_subtitle(subtitle[k].p2, e.p2))  {
                 merge = true;
                 subtitle[k].t1_cs = std::max(subtitle[k].t1_cs, e.t1_cs);
                 subtitle[k].timecode =
