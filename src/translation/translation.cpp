@@ -211,7 +211,11 @@ int translation_start(ai_translation_parmas& atp, pipeline_buffer& buffer) {
         llama_log_set(cb_log_disable, NULL);
     }
 
-    const auto glossary = load_glossary_file("/Users/wang/code/test/src/rag/qwer");
+    std::filesystem::path bin = std::filesystem::absolute(atp.app_name);
+    std::filesystem::path resource_root = bin.parent_path().parent_path();
+    std::filesystem::path glossary_path = resource_root / "rag" / "qwer";
+
+    const auto glossary = load_glossary_file(glossary_path.string());
 
     ggml_backend_load_all();
 

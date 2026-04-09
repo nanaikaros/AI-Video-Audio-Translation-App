@@ -91,12 +91,13 @@ int ocr_start(ai_translation_parmas& atp, output_params& out_params,
   std::vector<SubtitlesEntry>& subtitle = buffer.asr_entries;
   int n = buffer.ocr_frames.size();
 
-  // namespace fs = std::filesystem;
-  // fs::path(__FILE__).parent_path();
+  std::filesystem::path bin = std::filesystem::absolute(atp.app_name);
+  std::filesystem::path resource_root = bin.parent_path().parent_path();
+  std::filesystem::path model_root = resource_root / "models";
 
   // text 
-  params.text_detection_model_dir = "/Users/wang/code/test/src/paddle/models/PP-OCRv5_server_det_infer";
-  params.text_recognition_model_dir = "/Users/wang/code/test/src/paddle/models/korean_PP-OCRv5_mobile_rec_infer";
+  params.text_detection_model_dir = (model_root / "PP-OCRv5_server_det_infer").string();
+  params.text_recognition_model_dir = (model_root / "korean_PP-OCRv5_mobile_rec_infer").string();
 
   params.device = "gpu"; // 推理时使用GPU。请确保编译时添加 -DWITH_GPU=ON 选项，否则使用CPU。
   params.use_doc_orientation_classify = false;  // 不使用文档方向分类模型。

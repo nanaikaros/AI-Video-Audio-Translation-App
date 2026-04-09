@@ -18,6 +18,14 @@
       {
         "from": "../build",
         "to": "backend"
+      },
+      {
+        "from": "../models",
+        "to": "models"
+      },
+      {
+        "from": "../rag",
+        "to": "rag"
       }
     ],
     "mac": {
