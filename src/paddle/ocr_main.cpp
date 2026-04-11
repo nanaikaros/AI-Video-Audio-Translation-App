@@ -85,6 +85,42 @@ bool same_region(const std::string& a, const std::string& b) {
   return sim >= threshold;
 };
 
+bool is_target_text(std::string& str){
+  if (str.empty()) return false;
+
+  const unsigned char* s = reinterpret_cast<const unsigned char*>(str.data());
+  const size_t n = str.size();
+
+  bool has_hangul = false;
+
+  for (size_t i = 0; i < n; ++i) {
+    const unsigned char c = s[i];
+
+    if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
+      return false;
+    }
+
+    if (i + 2 < n) {
+      const unsigned char b0 = s[i];
+      const unsigned char b1 = s[i + 1];
+      const unsigned char b2 = s[i + 2];
+
+      if ((b0 >= 0xEA && b0 <= 0xED) &&
+          ((b1 & 0xC0) == 0x80) &&
+          ((b2 & 0xC0) == 0x80)) {
+        if (!(b0 == 0xEA && b1 < 0xB0) &&
+            !(b0 == 0xED && b1 > 0x9E) &&
+            !(b0 == 0xED && b1 == 0x9E && b2 > 0xA3)) {
+          has_hangul = true;
+          i += 2; 
+        }
+      }
+    }
+  }
+
+  return has_hangul;
+}
+
 int ocr_start(ai_translation_parmas& atp, output_params& out_params, 
   pipeline_buffer& buffer){
   PaddleOCRParams params;
@@ -96,14 +132,14 @@ int ocr_start(ai_translation_parmas& atp, output_params& out_params,
   std::filesystem::path model_root = resource_root / "models";
 
   // text 
-  params.text_detection_model_dir = (model_root / "PP-OCRv5_server_det_infer").string();
+  params.text_detection_model_dir = (model_root / "PP-OCRv5_mobile_det_infer").string();
   params.text_recognition_model_dir = (model_root / "korean_PP-OCRv5_mobile_rec_infer").string();
 
   params.device = "gpu"; // 推理时使用GPU。请确保编译时添加 -DWITH_GPU=ON 选项，否则使用CPU。
   params.use_doc_orientation_classify = false;  // 不使用文档方向分类模型。
   params.use_doc_unwarping = false; // 不使用文本图像矫正模型。
   params.use_textline_orientation = false; // 不使用文本行方向分类模型。
-  params.text_detection_model_name = "PP-OCRv5_server_det"; // 使用 PP-OCRv5_server_det 模型进行检测。
+  params.text_detection_model_name = "PP-OCRv5_mobile_det"; // 使用 PP-OCRv5_server_det 模型进行检测。
   params.text_recognition_model_name = "korean_PP-OCRv5_mobile_rec"; // 使用 PP-OCRv5_server_rec 模型进行识别。
   
   auto infer = My_PaddleOCR(params);
@@ -113,7 +149,7 @@ int ocr_start(ai_translation_parmas& atp, output_params& out_params,
     return 0;
   }
 
-  const int batch_size = 4;
+  const int batch_size = 8;
   const int progress_den = (n > 0) ? n : 1;
 
   for (int batch_start = 0; batch_start < n; batch_start += batch_size) {
@@ -160,6 +196,7 @@ int ocr_start(ai_translation_parmas& atp, output_params& out_params,
           
           for (int i = 0; i < static_cast<int>(pipeline_result.rec_texts.size()); ++i) {
             if (i >= static_cast<int>(pipeline_result.rec_boxes.size())) continue;
+            if(!is_target_text(pipeline_result.rec_texts[i])) continue;
 
             SubtitlesEntry e;
             e.index = j;

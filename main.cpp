@@ -21,7 +21,7 @@ static int params_parse(int argc, char ** argv, ai_translation_parmas& atp){
         else if ((arg == "--threads" || arg == "-t") && i + 1 < argc) atp.thread_num = std::stoi(argv[++i]);
         else if ((arg == "--output" || arg == "-o") && i + 1 < argc) atp.output_video_path = argv[++i];
         else if (arg == "--progress-sock" && i + 1 < argc) atp.progress_sock_path = argv[++i];
-        else if (arg == "--ocr") { atp.use_ocr = true; atp.ocr_all_frames = false; atp.sample_time = 0.5f; }
+        else if (arg == "--ocr") { atp.use_ocr = true; atp.ocr_all_frames = false; atp.sample_time = 0.8f; }
         else {
             fprintf(stderr, "error: unknown argument: %s\n", arg.c_str());
             return -1;

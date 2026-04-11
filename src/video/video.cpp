@@ -516,8 +516,7 @@ static int set_default_ass_header(AVStream* s_st, int x, int y) {
         "Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
         "Alignment, MarginL, MarginR, MarginV, Encoding\n"
         "Style: Default,Arial," + std::to_string(fontSize) +
-        ",&H00FFFFFF,&H000000FF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1," +
-        std::to_string(outline) + "," + std::to_string(shadow) + ",2," +
+        ",&H00FFFFFF,&H00FFFFFF,&H00000000,&HF0000000,0,0,0,0,100,100,0,0,3,6,0,2," +
         std::to_string(marginLR) + "," + std::to_string(marginLR) + "," + std::to_string(marginV) + ",1\n"
         "\n"
         "[Events]\n"

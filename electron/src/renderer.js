@@ -6,6 +6,23 @@ window.addEventListener('DOMContentLoaded', () => {
   let isRunning = false;
   let progressMode = 'whisper';
 
+  const validateBeforeRun = () => {
+    const videoPath = state.videoPath?.trim() || '';
+    const outputPath = $('outputPath')?.value?.trim() || state.outputPath || '';
+    const whisperModel = $('whisperModel')?.value?.trim() || '';
+    const translationModel = $('translationModel')?.value?.trim() || '';
+
+    if (!videoPath) return '请先选择视频文件';
+    if (!outputPath) return '请先选择输出路径';
+    if (!translationModel) return '请先选择翻译模型';
+
+    if (progressMode !== 'ocr' && !whisperModel) {
+      return '请先选择 Whisper 模型';
+    }
+
+    return '';
+  };
+
   const runBtn = $('run');
   const whisperBar = $('whisperProgressBar');
   const whisperText = $('whisperProgressText');
@@ -155,7 +172,11 @@ window.addEventListener('DOMContentLoaded', () => {
   // start processing
   $('run')?.addEventListener('click', async () => {
     if (isRunning) return;
-    if (!state.videoPath) return;
+    const err = validateBeforeRun();
+    if (err) {
+      alert(err);
+      return;
+    }
 
     isRunning = true;
     setRunButtonState(true);

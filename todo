@@ -64,10 +64,18 @@ todo:
   5. 修改依赖关系 不再依赖llama和whisper库 ✅
 
 ** rag 文本增强检索
-  1. 名词库
+  1. 名词库 bawige
   总结名词： 每行一条：源术语<TAB>目标术语<TAB> 在Prompt 注入模板
   A => 甲
   B => 乙
   
   
   2. 嵌入向量比较
+
+
+ffmpeg -i 37389861585-1-192_subtitle.mkv -map 0:v -map 0:a? -map 0:s:2 -c:v copy -c:a copy -c:s mov_text 37389861585-1-192_subtitle.mp4
+
+
+todo: 
+长视频 -> 剪切视频做多进程处理 -> 合并视频
+mkv -> mp4 字幕硬烧录
