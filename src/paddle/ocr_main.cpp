@@ -75,7 +75,7 @@ bool same_region(const std::string& a, const std::string& b) {
   if (na == nb) return true;
 
   const size_t max_len = std::max(na.size(), nb.size());
-  const size_t ngram_n = (max_len <= 6) ? 1 : 2; // 短文本更容易抖动
+  const size_t ngram_n = (max_len <= 6) ? 1 : 2;
   const double threshold = (max_len <= 6) ? 0.92 : 0.85;
 
   const auto ha = build_ngram_hist(na, ngram_n);
@@ -92,12 +92,13 @@ bool is_target_text(std::string& str){
   const size_t n = str.size();
 
   bool has_hangul = false;
-
+  int count = 0;
   for (size_t i = 0; i < n; ++i) {
     const unsigned char c = s[i];
 
-    if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
-      return false;
+    // ascii
+    if (c >= 0x00 && c <= 0x7f) {
+      count++;
     }
 
     if (i + 2 < n) {
@@ -117,7 +118,7 @@ bool is_target_text(std::string& str){
       }
     }
   }
-
+  if(count == n) return false;
   return has_hangul;
 }
 
@@ -172,63 +173,56 @@ int ocr_start(ai_translation_parmas& atp, output_params& out_params,
       int j = batch_start + local;
       auto& output = outputs[local];
       OCRResult* result = dynamic_cast<OCRResult*>(output.get());
-      if (result != nullptr) {
-        OCRPipelineResult pipeline_result = result->GetPipelineResult();
+      if(!result) continue;
+      OCRPipelineResult pipeline_result = result->GetPipelineResult();
+      if(pipeline_result.rec_texts.empty()) continue;
 
-        if (!pipeline_result.rec_texts.empty()) {
-          int64_t t0 = buffer.ocr_frames[j].ts_ms;
-          int64_t t1 = t0 + 33; // 默认兜底约 30fps
+      int64_t t0 = buffer.ocr_frames[j].ts_ms;
+      int64_t t1 = t0 + 33; // 默认兜底约 30fps
+      
+      if (atp.sample_time > 0.0) {
+        t1 = t0 + static_cast<int64_t>(atp.sample_time * 1000.0);
+      } else if (j + 1 < n) {
+        t1 = buffer.ocr_frames[j + 1].ts_ms;
+      }
 
-          if (j + 1 < n) {
-            t1 = buffer.ocr_frames[j + 1].ts_ms;
-          } else if (j > 0) {
-            int64_t delta = t0 - buffer.ocr_frames[j - 1].ts_ms;
-            if (delta <= 0) delta = 33;
-            t1 = t0 + delta;
-          } else if (atp.sample_time > 0.0) {
-            t1 = t0 + static_cast<int64_t>(atp.sample_time * 1000.0);
-          }
+      int64_t t0_cs = std::max<int64_t>(0, t0 / 10);
+      int64_t t1_cs = std::max<int64_t>(t0_cs + 1, (t1 + 9) / 10);
+      
+      for (int i = 0; i < static_cast<int>(pipeline_result.rec_texts.size()); ++i) {
+        // todo：添加多种语言判断
+        if(!is_target_text(pipeline_result.rec_texts[i])) continue;
 
-          if (t1 <= t0) t1 = t0 + 1;
+        SubtitlesEntry e;
+        e.index = j;
+        e.timecode = to_timestamp(t0_cs, true) + " --> " + to_timestamp(t1_cs, true);
+        e.text = pipeline_result.rec_texts[i];
 
-          int64_t t0_cs = std::max<int64_t>(0, t0 / 10);
-          int64_t t1_cs = std::max<int64_t>(t0_cs + 1, (t1 + 9) / 10);
-          
-          for (int i = 0; i < static_cast<int>(pipeline_result.rec_texts.size()); ++i) {
-            if (i >= static_cast<int>(pipeline_result.rec_boxes.size())) continue;
-            if(!is_target_text(pipeline_result.rec_texts[i])) continue;
-
-            SubtitlesEntry e;
-            e.index = j;
-            e.timecode = to_timestamp(t0_cs, true) + " --> " + to_timestamp(t1_cs, true);
-            e.text = pipeline_result.rec_texts[i];
-
-            auto& p = pipeline_result.rec_boxes[i];
-            e.p1 = std::make_pair(p[0], p[1]);
-            e.p2 = std::make_pair(p[2], p[3]);
-            e.t0_cs = t0_cs;
-            e.t1_cs = t1_cs;
-            
-            // 字幕合并
-            bool merge = false;
-            // const std::string e_norm = normalize_text(e.text);  
-            for (int k = 0; k < (int)subtitle.size(); ++k) {
-              if (subtitle[k].t1_cs + 50 < t0_cs) continue;
-              // const std::string s_norm = normalize_text(subtitle[k].text);
-              if (same_region(subtitle[k].text, e.text) &&
-                  same_subtitle(subtitle[k].p1, e.p1) &&
-                  same_subtitle(subtitle[k].p2, e.p2))  {
-                merge = true;
-                subtitle[k].t1_cs = std::max(subtitle[k].t1_cs, e.t1_cs);
-                subtitle[k].timecode =
-                  to_timestamp(subtitle[k].t0_cs, true) + " --> " + to_timestamp(subtitle[k].t1_cs, true);
-                break;
-              }
-            }
-            if (!merge) subtitle.emplace_back(std::move(e));
+        auto& p = pipeline_result.rec_boxes[i];
+        e.p1 = std::make_pair(p[0], p[1]);
+        e.p2 = std::make_pair(p[2], p[3]);
+        e.t0_cs = t0_cs;
+        e.t1_cs = t1_cs;
+        
+        // 字幕合并
+        bool merge = false;
+        // const std::string e_norm = normalize_text(e.text);  
+        // const std::string s_norm = normalize_text(subtitle[k].text);
+        for (int k = 0; k < subtitle.size(); ++k) {
+          if (subtitle[k].t1_cs + 50 < t0_cs) continue;
+          if (same_region(subtitle[k].text, e.text) &&
+              same_subtitle(subtitle[k].p1, e.p1) &&
+              same_subtitle(subtitle[k].p2, e.p2))  {
+            merge = true;
+            subtitle[k].t1_cs = std::max(subtitle[k].t1_cs, e.t1_cs);
+            subtitle[k].timecode =
+              to_timestamp(subtitle[k].t0_cs, true) + " --> " + to_timestamp(subtitle[k].t1_cs, true);
+            break;
           }
         }
+        if (!merge) subtitle.emplace_back(std::move(e));
       }
+      
       progress_ipc_send("ocr", static_cast<int>((j + 1) * 100.0 / progress_den));
     }
   }

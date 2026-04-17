@@ -143,13 +143,13 @@ int video_extract_picture(const std::string& in_video, std::vector<OcrFrame>& fr
     AVPacket* inPkt = nullptr;
     int videoStream = -1;
 
-    auto cleanup = [&](int code) -> int {
+    auto cleanup = [&](int ret) -> int {
         if (inPkt) av_packet_free(&inPkt);
         if (inFrame) av_frame_free(&inFrame);
         if (sws) sws_freeContext(sws);
         if (decCtx) avcodec_free_context(&decCtx);
         if (inFmt) avformat_close_input(&inFmt);
-        return code;
+        return ret;
     };
 
     // if (interval_sec <= 0) interval_sec = 1;
@@ -184,11 +184,9 @@ int video_extract_picture(const std::string& in_video, std::vector<OcrFrame>& fr
     if (!inFrame || !inPkt) return cleanup(AVERROR(ENOMEM));
 
     AVRational tb = inFmt->streams[videoStream]->time_base;
-    // 1sec extract one frame
+    // extract one frame
     const bool extract_all_frames = (interval_sec <= 0.0);
-    int64_t step_us = extract_all_frames
-        ? 0
-        : static_cast<int64_t>(interval_sec * 1000000.0);
+    int64_t step_us = extract_all_frames ? 0 : static_cast<int64_t>(interval_sec * 1000000.0);
     if (!extract_all_frames && step_us <= 0) step_us = 1;
     int64_t next_us = 0;
 
@@ -274,6 +272,7 @@ int video_extract_picture(const std::string& in_video, std::vector<OcrFrame>& fr
     ret = avcodec_send_packet(decCtx, nullptr);
     if (ret < 0) return cleanup(ret);
 
+    // avoid missing frame
     while (true) {
         ret = avcodec_receive_frame(decCtx, inFrame);
         if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
@@ -400,6 +399,7 @@ static int write_ass_from_entry(AVFormatContext* ofmt, int s_out_idx, const ASSD
     }
 
     AVStream* st = ofmt->streams[s_out_idx];
+    // pts -> 字幕包在字幕流时间轴上的显示起始时间戳
     int64_t pts = av_rescale_q(start, AVRational{1, 100}, st->time_base);
     int64_t dur = av_rescale_q(std::max<int64_t>(1, end - start), AVRational{1, 100}, st->time_base);
 
@@ -412,14 +412,14 @@ static int write_ass_from_entry(AVFormatContext* ofmt, int s_out_idx, const ASSD
     std::string text = e.text ? e.text : "";
     if(text.empty()) text = " ";
 
-    for (size_t pos = 0; (pos = text.find('\n', pos)) != std::string::npos; ) {
+    for (size_t pos = 0; (pos = text.find('\n', pos)) != std::string::npos; pos += 2) {
         text.replace(pos, 1, "\\N");
-        pos += 2;
     }
 
-    // Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+    
     static int read_order = 0;
 
+    // Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     std::string payload = std::to_string(read_order++) + ",0,Default,,0,0,0,," + text;
     AVPacket* pkt = av_packet_alloc();
     if (!pkt) return AVERROR(ENOMEM);
@@ -453,7 +453,7 @@ std::vector<ASSDialog> srt_to_ass(std::vector<SubtitlesEntry>& entry, int width,
     ass.reserve(n);
 
     for(int i = 0; i < n; ++i){
-        int64_t t0 = 0, t1 = 0;
+        int64_t t0, t1;
         if(!parse_ass_timecode_ms(entry[i].timecode, t0, t1)){
             std::cerr << "[ass] skip bad timecode: " << entry[i].timecode << "\n";
             continue;
@@ -498,12 +498,12 @@ std::vector<ASSDialog> srt_to_ass(std::vector<SubtitlesEntry>& entry, int width,
  * defalut header
  */
 static int set_default_ass_header(AVStream* s_st, int x, int y) {
-    const int base = std::max(1, std::min(x, y));
+    // const int base = std::max(1, std::min(x, y));
     const int fontSize = std::clamp((int)std::lround(y * 0.06), 24, 72);
     const int marginV  = std::clamp((int)std::lround(y * 0.03),  12, 80);
     const int marginLR = std::clamp((int)std::lround(x * 0.015), 10, 60);
-    const int outline  = std::clamp((int)std::lround(base * 0.0025), 1, 4);
-    const int shadow   = std::clamp((int)std::lround(base * 0.0015), 0, 3);
+    // const int outline  = std::clamp((int)std::lround(base * 0.0025), 1, 4);
+    // const int shadow   = std::clamp((int)std::lround(base * 0.0015), 0, 3);
 
     std::string hdr =
         "[Script Info]\n"
@@ -522,13 +522,13 @@ static int set_default_ass_header(AVStream* s_st, int x, int y) {
         "[Events]\n"
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n";
 
-    size_t n = hdr.size();
+    int n = hdr.size();
     uint8_t* extra = (uint8_t*)av_mallocz(n + AV_INPUT_BUFFER_PADDING_SIZE);
     if (!extra) return AVERROR(ENOMEM);
 
     std::memcpy(extra, hdr.data(), n);
     s_st->codecpar->extradata = extra;
-    s_st->codecpar->extradata_size = (int)n;
+    s_st->codecpar->extradata_size = n;
     return 0;
 }
 
@@ -550,7 +550,6 @@ int mux_video_with_ass_api(const char* video_path, pipeline_buffer& buffer, cons
     int entries_idx = 0;
     int copied_av_streams = 0;
     int64_t written_av_packets = 0;
-
     int64_t last_pts = AV_NOPTS_VALUE;
 
     if (!video_path || !out_video_path) return AVERROR(EINVAL);
@@ -571,7 +570,8 @@ int mux_video_with_ass_api(const char* video_path, pipeline_buffer& buffer, cons
     const std::vector<ASSDialog>& entries = srt_to_ass(buffer.subtitles_entries, width, height);
     if (entries.empty()) {
         std::cerr << "[mux] no subtitle entries\n";
-        return AVERROR(EINVAL);
+        ret = AVERROR(EINVAL); 
+        goto end;
     }
 
     if ((ret = avformat_alloc_output_context2(&ofmt, nullptr, "matroska", out_video_path)) < 0) 
@@ -581,11 +581,6 @@ int mux_video_with_ass_api(const char* video_path, pipeline_buffer& buffer, cons
     for (unsigned i = 0; i < vfmt->nb_streams; ++i) {
         AVStream* in_st = vfmt->streams[i];
         AVMediaType mt = in_st->codecpar->codec_type;
-        if (mt == AVMEDIA_TYPE_VIDEO && in_st->codecpar->width > 0 
-                && in_st->codecpar->height > 0) {
-            width = in_st->codecpar->width;
-            height = in_st->codecpar->height;
-        }
         if (mt != AVMEDIA_TYPE_VIDEO && mt != AVMEDIA_TYPE_AUDIO) continue;
 
         AVStream* out_st = avformat_new_stream(ofmt, nullptr);
@@ -664,6 +659,7 @@ int mux_video_with_ass_api(const char* video_path, pipeline_buffer& buffer, cons
         av_packet_unref(pkt);
     }
 
+    // 剩下的字幕写入
     for (int i = entries_idx; i < entries.size(); ++i) {
         int r = write_ass_from_entry(ofmt, subtitle_idx, entries[i], last_pts);
         if (r < 0) { ret = r; goto end; }
@@ -677,6 +673,8 @@ int mux_video_with_ass_api(const char* video_path, pipeline_buffer& buffer, cons
         ret = AVERROR_INVALIDDATA;
         goto end;
     }
+
+    // todo: 转mp4
 
     ret = av_write_trailer(ofmt);
 

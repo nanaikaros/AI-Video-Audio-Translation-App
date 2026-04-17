@@ -32,7 +32,7 @@ struct ai_translation_parmas {
 
     bool use_ocr = false;
     bool ocr_all_frames = false;   // full frame
-    double sample_time = 0.5;      // sample frame
+    double sample_time = 1;      // sample frame default 1 s
 };
 
 struct OcrFrame {

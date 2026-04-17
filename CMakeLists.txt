@@ -40,7 +40,7 @@ endif()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/paddle)
 
-SET(PADDLE_LIB "${CMAKE_CURRENT_SOURCE_DIR}/src/paddle/paddle_inference")
+SET(PADDLE_LIB "${CMAKE_CURRENT_SOURCE_DIR}/src/paddle/paddle_inference/paddle_inference_install_dir")
 link_directories("${PADDLE_LIB}/third_party/install/protobuf/lib")
 link_directories("${PADDLE_LIB}/third_party/install/glog/lib")
 link_directories("${PADDLE_LIB}/third_party/install/gflags/lib")
