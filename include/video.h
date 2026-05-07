@@ -22,3 +22,6 @@ int mux_video_with_ass_api(const char* video_path, pipeline_buffer&,
 int video_extract_picture(const std::string& in_video,
                           std::vector<OcrFrame>& frames_out,
                           double interval_sec = 1);
+
+int mkv_to_mp4_with_subtitles(const std::string& input_mkv,
+                              const std::string& output_mp4);

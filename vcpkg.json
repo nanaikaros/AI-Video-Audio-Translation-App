@@ -1,7 +1,20 @@
 {
   "dependencies": [
-    "ffmpeg",
-    "opencv4",
-    "openblas"
+    {
+      "name": "ffmpeg",
+      "features": ["ass"]
+    },
+    {
+      "name": "opencv4"
+    },
+    {
+      "name": "openblas"
+    },
+    {
+      "name": "libzip"
+    },
+    {
+      "name": "onnxruntime"
+    }
   ]
 }

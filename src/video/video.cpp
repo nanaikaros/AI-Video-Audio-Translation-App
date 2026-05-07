@@ -1,5 +1,7 @@
 #include "video.h"
 
+#include "ocr_cache/ocr_cache.hpp"
+
 #include <cstdlib>
 #include <string>
 #include <iostream>
@@ -131,7 +133,6 @@ end:
     if (inFmt) avformat_close_input(&inFmt);
     return ret;
 }
-
 
 int video_extract_picture(const std::string& in_video, std::vector<OcrFrame>& frames_out, double interval_sec) {
     frames_out.clear();
@@ -303,6 +304,9 @@ int video_strat(ai_translation_parmas& atp, output_params& out, pipeline_buffer&
 
     int ret;
     if(atp.use_ocr){
+        std::vector<SubtitlesEntry> temp;
+        if(load_ocr_cache(atp, temp)) return 0;
+
         const double ocr_interval = atp.ocr_all_frames ? 0.0 : atp.sample_time;
         ret = video_extract_picture(atp.video_path, ocr, ocr_interval);
 
@@ -464,7 +468,9 @@ std::vector<ASSDialog> srt_to_ass(std::vector<SubtitlesEntry>& entry, int width,
         d.start = t0;
         d.end = t1;
         
-        d.text = const_cast<char *>(entry[i].text.c_str());
+        if(entry[i].trans_text.has_value()){
+            d.text = const_cast<char*>(entry[i].trans_text.value().c_str());
+        }
 
         if (entry[i].p1.has_value()) {
             int left = static_cast<int>(std::min(entry[i].p1->first, entry[i].p2->first));
@@ -478,15 +484,21 @@ std::vector<ASSDialog> srt_to_ass(std::vector<SubtitlesEntry>& entry, int width,
             bottom = std::clamp(bottom, 0, height - 1);
 
             int box_h = std::max(1, bottom - top);
-            int font_size = std::clamp(static_cast<int>(std::lround(box_h * 0.9)), 18, 72);
+            int font_size = std::clamp(static_cast<int>(std::lround(box_h * 0.98)), 18, 72);
 
             int x = std::clamp((left + right) / 2, 0, width - 1);
-            int y = std::clamp(top - font_size - 4, 0, height - 1);
+            const int padding = 4;
+            // down
+            int y = std::clamp(bottom + padding, 0, std::max(0, height - font_size - 2));
 
-            entry[i].text = "{\\an8\\pos(" + std::to_string(x) + "," +
-                            std::to_string(y) + ")\\fs" + std::to_string(font_size) + "}" +
-                            entry[i].text;
-            d.text = const_cast<char*>(entry[i].text.c_str());
+            // up
+            // int y = std::clamp(top - font_size - 4, 0, height - 1);
+            if(entry[i].trans_text.has_value()){
+                entry[i].trans_text = "{\\an8\\pos(" + std::to_string(x) + "," +
+                                std::to_string(y) + ")\\fs" + std::to_string(font_size) + "}" +
+                                entry[i].trans_text.value();
+                d.text = const_cast<char*>(entry[i].trans_text.value().c_str());    
+            }
         }
         ass.push_back(d);
     }
@@ -516,7 +528,7 @@ static int set_default_ass_header(AVStream* s_st, int x, int y) {
         "Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
         "Alignment, MarginL, MarginR, MarginV, Encoding\n"
         "Style: Default,Arial," + std::to_string(fontSize) +
-        ",&H00FFFFFF,&H00FFFFFF,&H00000000,&HF0000000,0,0,0,0,100,100,0,0,3,6,0,2," +
+        ",&H00FFFFFF,&H00FFFFFF,&H00000000,&H60000000,0,0,0,0,100,100,0,0,3,1,0,2," +
         std::to_string(marginLR) + "," + std::to_string(marginLR) + "," + std::to_string(marginV) + ",1\n"
         "\n"
         "[Events]\n"
@@ -673,8 +685,6 @@ int mux_video_with_ass_api(const char* video_path, pipeline_buffer& buffer, cons
         ret = AVERROR_INVALIDDATA;
         goto end;
     }
-
-    // todo: 转mp4
 
     ret = av_write_trailer(ofmt);
 

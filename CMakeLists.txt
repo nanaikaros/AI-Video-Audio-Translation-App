@@ -12,6 +12,10 @@ set(WHISPER_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/whisper)
 set(LLAMA_SRC_DIR   ${CMAKE_CURRENT_SOURCE_DIR}/src/llama)
 set(PADDLE_SRC_DIR  ${CMAKE_CURRENT_SOURCE_DIR}/src/paddle)
 
+set(ORTX_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/onnxruntime-extensions)
+set(ORTX_INCLUDE_DIR ${ORTX_SRC_DIR}/include)
+set(ORTX_BUILD_DIR ${ORTX_SRC_DIR}/build)
+
 set(WHISPER_USE_SYSTEM_GGML ON CACHE BOOL "" FORCE)
 set(LLAMA_USE_SYSTEM_GGML   ON CACHE BOOL "" FORCE)
 
@@ -56,6 +60,8 @@ add_subdirectory(${LLAMA_SRC_DIR} llama_build)
 add_executable(my_app
     src/translation/translation.cpp
     src/video/video.cpp
+    src/video/mp4.cpp
+    src/tool/fileloader.hpp
     src/whisper/whisper_bridge.cpp
     src/paddle/ocr_main.cpp
     common/progress_ipc.cpp
@@ -96,13 +102,16 @@ target_link_libraries(my_app PRIVATE
 
 # vcpkg
 find_package(FFMPEG REQUIRED)
+find_package(libzip CONFIG REQUIRED)
 target_include_directories(my_app PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${FFMPEG_INCLUDE_DIRS}
+  ${ORTX_INCLUDE_DIR}
+  ${CMAKE_CURRENT_SOURCE_DIR}/vcpkg_installed/arm64-osx/include
 )
 
 if(WIN32)
-  target_link_libraries(my_app PRIVATE Ws2_32 ${FFMPEG_LIBRARIES})
+  target_link_libraries(my_app PRIVATE Ws2_32 ${FFMPEG_LIBRARIES} libzip::zip)
 elseif(APPLE)
-  target_link_libraries(my_app PRIVATE ${FFMPEG_LIBRARIES})
+  target_link_libraries(my_app PRIVATE ${FFMPEG_LIBRARIES} libzip::zip)
 endif()

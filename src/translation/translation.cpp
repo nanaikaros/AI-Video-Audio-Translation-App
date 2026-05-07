@@ -1,11 +1,22 @@
 #include "translation.h"
 
+#include "ocr_cache/ocr_cache.hpp"
+
 #include <thread>
 #include <atomic>
 #include <chrono>
 #include <stack>
 
 static void cb_log_disable(enum ggml_log_level , const char * , void * ) { }
+
+static const char* kSystemPrompt = 
+    "You are a subtitle translation engine.\n"
+    "Automatically detect the source language of each sentence and translate everything into Simplified Chinese.\n"
+    "Output only translated subtitle text.\n"
+    "No explanation, no extra notes, no original text.\n"
+    "If one subtitle line is long, insert natural line breaks for reading.\n"
+    "Keep meaning accurate, concise, and subtitle-friendly.\n"
+    "Do not add labels, explanations, prefixes, or notes.\n";
 
 static std::string trim_copy(std::string s) {
     auto not_space = [](unsigned char c) { return !std::isspace(c); };
@@ -46,35 +57,23 @@ static std::string send_to_model(
     int n_predict,
     const std::vector<glossary_pair> * glossary_hits
 ) {
-    // llama_memory_clear(llama_get_memory(ctx), true);
+    llama_memory_clear(llama_get_memory(ctx), true);
 
     // todo: rag
-    std::string prompt;
-
-    if(is_background){
-        prompt = 
-            "You are a subtitle translation engine.\n"
-            "Automatically detect the source language of each sentence and translate everything into Simplified Chinese.\n"
-            "Output only translated subtitle text.\n"
-            "No explanation, no extra notes, no original text.\n"
-            "If one subtitle line is long, insert natural line breaks for reading.\n"
-            "Keep meaning accurate, concise, and subtitle-friendly.\n"
-            "Do not add labels, explanations, prefixes, or notes.\n";
-    } else {
-        std::string glossary_block;
-        if (glossary_hits && !glossary_hits->empty()) {
-            glossary_block += "Terminology constraints (must follow):\n";
-            for (const auto & p : *glossary_hits) {
-                glossary_block += "- " + p.src + " => " + p.dst + "\n";
-            }
-            glossary_block += "\n";
+    std::string glossary_block;
+    if (glossary_hits && !glossary_hits->empty()) {
+        glossary_block += "Terminology constraints (must follow):\n";
+        for (const auto & p : *glossary_hits) {
+            glossary_block += "- " + p.src + " => " + p.dst + "\n";
         }
-
-        prompt =
-            glossary_block +
-            "Input:\n" + sentances + "\n"
-            "Output:\n";
+        glossary_block += "\n";
     }
+
+    std::string prompt =
+        std::string(kSystemPrompt) + "\n" +
+        glossary_block +
+        "Input:\n" + sentances + "\n"
+        "Output:\n";
 
     const int n_prompt = -llama_tokenize(vocab, prompt.c_str(), prompt.size(), nullptr, 0, true, true);
     if (n_prompt <= 0) {
@@ -99,7 +98,7 @@ static std::string send_to_model(
         batch = llama_batch_get_one(&decoder_start, 1);
     }
 
-    if(is_background || n_predict <= 0){
+    if(n_predict <= 0){
         if (!llama_decode(ctx, batch)) return "";
         else return "";
     }
@@ -228,7 +227,8 @@ int translation_start(ai_translation_parmas& atp, pipeline_buffer& buffer) {
         return -1;
     }
 
-    auto entries = in_srt;
+    std::vector<SubtitlesEntry> entries = in_srt;
+    if(!load_ocr_cache(atp, entries)) entries = in_srt;
 
     std::atomic<size_t> next{0};
     std::atomic<size_t> done{0};
@@ -247,6 +247,8 @@ int translation_start(ai_translation_parmas& atp, pipeline_buffer& buffer) {
             std::this_thread::sleep_for(std::chrono::milliseconds(3000));
         }
     });
+
+    // std::vector<SubtitlesEntry> subtitle_arr;
 
     std::vector<std::thread> pool;
     pool.reserve(workers);
@@ -268,15 +270,15 @@ int translation_start(ai_translation_parmas& atp, pipeline_buffer& buffer) {
             const llama_vocab * tvocab = llama_model_get_vocab(model);
 
             // video background
-            send_to_model(model, tctx, tsmpl, tvocab, "", true, n_predict, {});
+            // send_to_model(model, tctx, tsmpl, tvocab, "", true, n_predict, {});
 
             while (true) {
                 size_t i = next.fetch_add(1);
                 if (i >= entries.size()) break;
-                if (!entries[i].text.empty()) {
-                    auto hits = collect_glossary_hits(glossary, entries[i].text, 12);
+                if (!entries[i].text.empty() && !entries[i].trans_text.has_value()) {
+                    auto hits = collect_glossary_hits(glossary, entries[i].text, 64);
                     std::string trans = send_to_model(model, tctx, tsmpl, tvocab, entries[i].text, false, n_predict, &hits);
-                    entries[i].text = clean_translation(trans);
+                    entries[i].trans_text = clean_translation(trans);
                 }
                 done.fetch_add(1, std::memory_order_relaxed);
             }
@@ -290,6 +292,7 @@ int translation_start(ai_translation_parmas& atp, pipeline_buffer& buffer) {
     if (progress_thread.joinable()) progress_thread.join();
 
     out_srt = entries;
+    save_ocr_cache(atp, entries); 
 
     llama_model_free(model);
 

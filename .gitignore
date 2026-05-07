@@ -18,4 +18,10 @@ CMakeUserPresets.json
 
 src/paddle/third_party/
 
+third_party
+
+*.txt
+
 src/paddle/paddle_inference/
+
+.temp

@@ -164,8 +164,8 @@ static void merge_subtilte(std::vector<SubtitlesEntry>& subtitle){
 
   const int64_t time_gap_cs = 300; // 3s 可调
 
-  std::stack<SubtitlesEntry> out;
-  // out.reserve(subtitle.size());
+  std::vector<SubtitlesEntry> out;
+  out.reserve(subtitle.size());
 
   for (auto &e : subtitle) {
     bool merged = false;

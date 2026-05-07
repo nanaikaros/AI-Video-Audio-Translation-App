@@ -15,6 +15,7 @@ struct SubtitlesEntry {
     std::string text;
     absl::optional<std::pair<float, float>> p1 = absl::nullopt; // 对角线 {x, y}
     absl::optional<std::pair<float, float>> p2 = absl::nullopt;
+    absl::optional<std::string> trans_text = absl::nullopt;
     int64_t t0_cs;
     int64_t t1_cs;
 };
