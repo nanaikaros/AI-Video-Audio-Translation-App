@@ -4,6 +4,7 @@
 #include <atomic>
 #include <chrono>
 #include <stack>
+#include <filesystem>
 
 static void cb_log_disable(enum ggml_log_level , const char * , void * ) { }
 
