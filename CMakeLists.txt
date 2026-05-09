@@ -1,5 +1,24 @@
 cmake_minimum_required(VERSION 3.14)
 project(AIVideoTranslationApp)
+# cmake --preset default -DWITH_STATIC_LIB=ON -DCMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded$<$<CONFIG:Debug>:Debug>"
+# cmake --build build --config Release
+if(MSVC)
+  # 优先使用新接口（CMake >= 3.15），并强制写入缓存
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE STRING "" FORCE)
+
+  # 兼容老 CMake：把已存在的 /MD(/MDd) 标志替换为 /MT(/MTd)
+  foreach(var CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE CMAKE_C_FLAGS_RELWITHDEBINFO CMAKE_CXX_FLAGS_RELWITHDEBINFO)
+    string(REPLACE "/MDd" "/MTd" ${var} "${${var}}")
+    string(REPLACE "/MD"  "/MT"  ${var} "${${var}}")
+    set(${var} "${${var}}" CACHE STRING "" FORCE)
+  endforeach()
+
+  # 保险起见，全局添加编译选项（按配置）
+  add_compile_options(
+    "$<$<CONFIG:Debug>:/MTd>"
+    "$<$<CONFIG:Release>:/MT>"
+  )
+endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -44,7 +63,13 @@ endif()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/paddle)
 
-SET(PADDLE_LIB "${CMAKE_CURRENT_SOURCE_DIR}/src/paddle/paddle_inference/paddle_inference_install_dir")
+
+if(APPLE)
+  set(PADDLE_LIB "${CMAKE_CURRENT_SOURCE_DIR}/src/paddle/paddle_inference/paddle_inference_install_dir")
+else()
+  set(PADDLE_LIB "${CMAKE_CURRENT_SOURCE_DIR}/src/paddle/paddle_inference")
+endif()
+
 link_directories("${PADDLE_LIB}/third_party/install/protobuf/lib")
 link_directories("${PADDLE_LIB}/third_party/install/glog/lib")
 link_directories("${PADDLE_LIB}/third_party/install/gflags/lib")
@@ -91,12 +116,10 @@ target_link_libraries(my_app PRIVATE
   whisper
   paddle
   glog
-  gflags
+  gflags_static
   xxhash
   yaml-cpp
   paddle_inference
-  phi
-  phi_core
   common
 )
 

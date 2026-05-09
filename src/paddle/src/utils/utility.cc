@@ -14,7 +14,11 @@
 
 #include "utility.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <dirent.h>
+#endif
 #include <sys/stat.h>
 
 #include <regex>
@@ -256,11 +260,49 @@ bool Utility::IsDirectory(const std::string &path) {
   if (stat(path.c_str(), &path_stat) != 0) {
     return false;
   }
+#ifdef _WIN32
+  return (path_stat.st_mode & _S_IFDIR) != 0;
+#else
   return S_ISDIR(path_stat.st_mode);
+#endif
 }
 
 void Utility::GetFilesRecursive(const std::string &dir_path,
                                 std::vector<std::string> &file_list) {
+#ifdef _WIN32
+  std::string search_path = dir_path;
+  if (!search_path.empty() && search_path.back() != '\\' && search_path.back() != '/') {
+    search_path += "\\";
+  }
+  search_path += "*";
+
+  WIN32_FIND_DATAA find_data;
+  HANDLE h_find = FindFirstFileA(search_path.c_str(), &find_data);
+  if (h_find == INVALID_HANDLE_VALUE) {
+    return;
+  }
+
+  do {
+    std::string name = find_data.cFileName;
+    if (name == "." || name == "..") {
+      continue;
+    }
+
+    std::string full_path = dir_path;
+    if (!full_path.empty() && full_path.back() != '\\' && full_path.back() != '/') {
+      full_path += PATH_SEPARATOR;
+    }
+    full_path += name;
+
+    if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+      Utility::GetFilesRecursive(full_path, file_list);
+    } else if (IsImageFile(full_path)) {
+      file_list.push_back(full_path);
+    }
+  } while (FindNextFileA(h_find, &find_data));
+
+  FindClose(h_find);
+#else
   DIR *dir = opendir(dir_path.c_str());
   if (dir == NULL) {
     return;
@@ -288,6 +330,7 @@ void Utility::GetFilesRecursive(const std::string &dir_path,
   }
 
   closedir(dir);
+#endif
 }
 
 bool Utility::IsImageFile(const std::string &file_path) {

@@ -13,8 +13,11 @@
 // limitations under the License.
 
 #include "image_batch_sampler.h"
-
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <dirent.h>
+#endif
 #include <sys/stat.h>
 
 #include <algorithm>
