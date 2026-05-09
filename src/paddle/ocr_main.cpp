@@ -292,7 +292,7 @@ int ocr_start(ai_translation_parmas& atp, output_params& out_params,
         const int fh = std::max(1, buffer.ocr_frames[j].mat.rows);
 
         // 控制翻译区域
-        if (cy < fh * 0.75) continue; // 画面上半区
+        if (cy < fh * 0.75) continue; // 只翻译画面下半部份
         // 控制翻译字体大小
         if(text_area_small(e)) continue;
 

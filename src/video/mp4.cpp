@@ -43,6 +43,11 @@ int mkv_to_mp4_with_subtitles(const std::string& input_mkv,
         + " -y";
 
     std::string cmd = "/bin/bash -lc " + shell_quote(cmd_str);
+    int ret = std::system(cmd.c_str());
+
+    const std::string del_mkv = "rm " + shell_quote(input_mkv);
+
+    cmd = "/bin/bash -lc " + shell_quote(del_mkv);
 
     return std::system(cmd.c_str());
 }

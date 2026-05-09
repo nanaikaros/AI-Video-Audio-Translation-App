@@ -9,7 +9,7 @@ try:
         base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
     )
 
-    ocr_path = "/Users/wang/Documents/娜英社长/5.5/.temp/video_[无字] 社长要去现场看LCK比..._0/ocr.json"
+    ocr_path = "/Users/wang/Documents/疯狂的孩子们/.temp/分割_video_[无字] 疯狂的孩子们 _ QW_4/ocr.json"
     rag_path = "/Users/wang/code/test/rag/qwer"
 
     def load_glossary(path):
