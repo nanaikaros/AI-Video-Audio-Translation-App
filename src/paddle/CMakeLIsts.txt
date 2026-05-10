@@ -187,6 +187,8 @@ if(WITH_STATIC_LIB)
   else()
     set(DEPS
       ${PADDLE_LIB}/paddle/lib/libpaddle_inference${CMAKE_STATIC_LIBRARY_SUFFIX}
+      ${PADDLE_LIB}/paddle/lib/libphi${CMAKE_SHARED_LIBRARY_SUFFIX}
+      ${PADDLE_LIB}/paddle/lib/libphi_core${CMAKE_SHARED_LIBRARY_SUFFIX}
     )
   endif()
 else()
@@ -195,8 +197,10 @@ else()
       "${PADDLE_LIB}/paddle/lib/paddle_inference.lib"
     )
   else()
-    set(DEPS
+    set(DEPS ${DEPS}
       ${PADDLE_LIB}/paddle/lib/libpaddle_inference${CMAKE_SHARED_LIBRARY_SUFFIX}
+      ${PADDLE_LIB}/paddle/lib/libphi${CMAKE_SHARED_LIBRARY_SUFFIX}
+      ${PADDLE_LIB}/paddle/lib/libphi_core${CMAKE_SHARED_LIBRARY_SUFFIX}
     )
   endif()
 endif()

@@ -1,4 +1,5 @@
 const { contextBridge, ipcRenderer } = require('electron');
+const { pathToFileURL } = require('url');
 
 // Context Isolation
 contextBridge.exposeInMainWorld('api', {
@@ -9,4 +10,5 @@ contextBridge.exposeInMainWorld('api', {
   onCppProgress: (cb) => ipcRenderer.on('cpp-progress', (_e, msg) => cb?.(msg)),
   runCppPipeline: (payload) => ipcRenderer.invoke('run-cpp-pipeline', payload),
   logFront: (level, msg) => ipcRenderer.send('frontend-log', { level, msg }),
+  toFileUrl: (filePath) => (filePath ? pathToFileURL(filePath).href : ''),
 });

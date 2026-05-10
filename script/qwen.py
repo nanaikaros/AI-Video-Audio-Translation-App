@@ -1,16 +1,17 @@
-import os
 import json
+import sys
 from openai import OpenAI
 
 try:
     client = OpenAI(
         # 若没有配置环境变量，请用阿里云百炼API Key将下行替换为: api_key="sk-xxx",
-        api_key="sk-79c41f0c81654aa1b44073e5703d5cc2",
-        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        api_key=json.load(open(sys.argv[3], "r"))["api_key"],
+        base_url=json.load(open(sys.argv[3], "r"))["base_url"],
     )
 
-    ocr_path = "/Users/wang/Documents/疯狂的孩子们/.temp/分割_video_[无字] 疯狂的孩子们 _ QW_4/ocr.json"
-    rag_path = "/Users/wang/code/test/rag/qwer"
+    # 从传入参数读取
+    ocr_path = sys.argv[1]
+    rag_path = sys.argv[2]
 
     def load_glossary(path):
         pairs = []
@@ -70,8 +71,19 @@ try:
 
     for batch in iter_batches(entries, batch_size):
         # 构造合并输入
+        pending_entries = []
+        for entry in batch:
+            trans_text = entry.get("trans_text")
+            if trans_text is not None:
+                continue
+            pending_entries.append(entry)
+
+        if not pending_entries:
+            continue
+
         user_lines = []
-        for i, entry in enumerate(batch, start=1):
+        for i, entry in enumerate(pending_entries, start=1):
+            if(entry["trans_text"] is not None): continue
             user_lines.append(f"{i}. {entry['text'].strip()}")
         user_prompt = (
             "请将下面每行翻译成简体中文，仅输出对应的译文，"
@@ -91,7 +103,7 @@ try:
         out_lines = [l.strip() for l in completion.choices[0].message.content.splitlines() if l.strip()]
 
         # 如果模型输出行数不匹配，建议加入兜底处理
-        for entry, translated in zip(batch, out_lines):
+        for entry, translated in zip(pending_entries, out_lines):
             entry["trans_text"] = translated
             processed += 1
         

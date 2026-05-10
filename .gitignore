@@ -25,3 +25,5 @@ third_party
 src/paddle/paddle_inference/
 
 .temp
+
+config.json

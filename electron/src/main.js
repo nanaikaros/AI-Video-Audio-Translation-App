@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const log = require('electron-log');
 const { spawn } = require('child_process');
+const { pathToFileURL } = require('url');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
@@ -56,10 +57,17 @@ ipcMain.on('frontend-log', (_e, payload) => {
 ipcMain.handle('pick-video', async () => {
   const ret = await dialog.showOpenDialog({
     properties: ['openFile'],
-    filters: [{ name: 'Video', extensions: ['mp4', 'mov', 'mkv', 'avi', 'flv'] }]
+    // 建议先只测这几种，避免选到浏览器解不了码的视频
+    filters: [{ name: 'Video', extensions: ['mp4', 'mov', 'm4v', 'webm'] }]
   });
+
   if (ret.canceled || ret.filePaths.length === 0) return null;
-  return ret.filePaths[0];
+
+  const filePath = ret.filePaths[0];
+  return {
+    path: filePath,
+    url: pathToFileURL(filePath).href,
+  };
 });
 
 ipcMain.handle('pick-file', async (_e, options = {}) => {
@@ -230,6 +238,10 @@ ipcMain.handle('run-cpp-pipeline', async (event, payload) => {
 
     if (payload.ocrEnabled) {
       args.push('--ocr');
+    }
+
+    if (payload.onlineTranslation) {
+      args.push('--ot');
     }
 
     log.info(`[run] cmd=${bin} ${args.join(' ')}`);

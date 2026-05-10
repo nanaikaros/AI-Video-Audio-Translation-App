@@ -9,6 +9,16 @@
 
 using json = nlohmann::json;
 
+static std::string shell_quote(const std::string& s) {
+    std::string out = "'";
+    for (char c : s) {
+        if (c == '\'') out += "'\\''";
+        else out += c;
+    }
+    out += "'";
+    return out;
+}
+
 // build the cache json
 static std::filesystem::path build_ocr_cache_path(const ai_translation_parmas& atp) {
   std::filesystem::path video(atp.video_path);

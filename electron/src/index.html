@@ -33,6 +33,7 @@
       <input id="threads" type="number" min="1" value="2" />
 
       <div class="actions">
+        <button id="onlineModeBtn" type="button">在线翻译</button>
         <button id="ocrModeBtn" type="button">OCR</button>
         <button id="run" class="primary">开始处理</button>
       </div>
@@ -43,8 +44,14 @@
       <section id="dropZone" class="card dropzone">
         <h2>文件输入</h2>
         <p>拖拽视频到这里，或点击按钮选择</p>
-        <button id="pickVideo">选择视频</button>
-        <div id="videoPath"></div>
+        <div class="video-preview-wrap">
+          <video id="previewVideo" class="preview-video" controls preload="metadata"></video>
+        </div>
+
+        <div class="drop-actions">
+          <button id="pickVideo">选择视频</button>
+          <div id="videoPath" class="path">未选择视频</div>
+        </div>
       </section>
 
       <section class="card progress-card">

@@ -183,6 +183,23 @@ static std::vector<glossary_pair> load_glossary_file(const std::string & path) {
     return out;
 }
 
+static void online_translation(ai_translation_parmas& atp){
+    std::filesystem::path ocr_path = build_ocr_cache_path(atp);
+    std::filesystem::path bin = std::filesystem::absolute(atp.app_name);
+    std::filesystem::path resource_root = bin.parent_path().parent_path();
+    std::filesystem::path glossary_path = resource_root / "rag" / "qwer";
+    std::filesystem::path py_path = resource_root / "script" / "qwen.py";
+    std::filesystem::path config_path = resource_root / "config.json";
+
+    const std::string cmd_str = "python " + shell_quote(py_path) + 
+        " " + shell_quote(ocr_path) + 
+        " " + shell_quote(glossary_path) + 
+        " " + shell_quote(config_path);
+
+    std::system(cmd_str.c_str());
+}
+
+
 /**
  * translation entrance
  * 
@@ -200,6 +217,11 @@ int translation_start(ai_translation_parmas& atp, pipeline_buffer& buffer) {
     int ngl = -1;
     bool print_log = false;
     bool show_progress = true;
+
+    if(atp.online_translation){
+        // online translation
+        online_translation(atp);
+    }
 
     if (model_path.empty() || in_srt.empty()) {
         std::cerr << "model path is empty" << std::endl;
@@ -229,6 +251,7 @@ int translation_start(ai_translation_parmas& atp, pipeline_buffer& buffer) {
     }
 
     std::vector<SubtitlesEntry> entries = in_srt;
+
     if(!load_ocr_cache(atp, entries)) entries = in_srt;
 
     std::atomic<size_t> next{0};

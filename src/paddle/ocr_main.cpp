@@ -162,7 +162,7 @@ static void merge_subtilte(std::vector<SubtitlesEntry>& subtitle){
               return a.t0_cs < b.t0_cs;
             });
 
-  const int64_t time_gap_cs = 300; // 3s 可调
+  const int64_t time_gap_cs = 200; // 3s 可调
 
   std::vector<SubtitlesEntry> out;
   out.reserve(subtitle.size());
@@ -214,7 +214,7 @@ int ocr_start(ai_translation_parmas& atp, output_params& out_params,
   params.text_detection_model_dir = (model_root / "PP-OCRv5_mobile_det_infer").string();
   params.text_recognition_model_dir = (model_root / "korean_PP-OCRv5_mobile_rec_infer").string();
 
-  params.device = "gpu"; // 推理时使用GPU。请确保编译时添加 -DWITH_GPU=ON 选项，否则使用CPU。
+  params.device = "cpu"; // 推理时使用GPU。请确保编译时添加 -DWITH_GPU=ON 选项，否则使用CPU。
   params.use_doc_orientation_classify = false;  // 不使用文档方向分类模型。
   params.use_doc_unwarping = false; // 不使用文本图像矫正模型。
   params.use_textline_orientation = false; // 不使用文本行方向分类模型。

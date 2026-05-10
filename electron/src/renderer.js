@@ -5,6 +5,88 @@ window.addEventListener('DOMContentLoaded', () => {
 
   let isRunning = false;
   let progressMode = 'whisper';
+  let translationOnline = false;
+
+  const previewVideo = $('previewVideo');
+  const videoPathText = $('videoPath');
+  let objectUrlToRevoke = '';
+
+  const cleanupObjectUrl = () => {
+    if (objectUrlToRevoke) {
+      URL.revokeObjectURL(objectUrlToRevoke);
+      objectUrlToRevoke = '';
+    }
+  };
+
+  const setVideoPreview = (filePath, src) => {
+    state.videoPath = filePath || '';
+    if (videoPathText) videoPathText.textContent = filePath || '未选择视频';
+    if (!previewVideo) return;
+
+    cleanupObjectUrl();
+
+    previewVideo.pause();
+    previewVideo.currentTime = 0;
+    previewVideo.removeAttribute('src');
+
+    if (!src) {
+      previewVideo.load();
+      return;
+    }
+
+    previewVideo.src = src;
+    previewVideo.load(); // 不自动播放
+  };
+
+  if (previewVideo) {
+    previewVideo.addEventListener('loadedmetadata', () => {
+      console.log('[preview] loadedmetadata ok:', previewVideo.duration);
+    });
+
+    previewVideo.addEventListener('error', () => {
+      const err = previewVideo.error;
+      console.error('[preview] error', {
+        code: err?.code,
+        message: err?.message,
+        currentSrc: previewVideo.currentSrc,
+      });
+      alert('视频无法播放，可能是编码不支持。请先用 mp4(h264+aac) 测试。');
+    });
+  }
+
+  const safeToFileUrl = (filePath) => {
+    // preload 未生效时兜底，避免直接报错
+    if (window.api?.toFileUrl) return window.api.toFileUrl(filePath);
+
+    // fallback: 手工转 file URL
+    const normalized = String(filePath || '').replace(/\\/g, '/');
+    return `file://${encodeURI(normalized)}`;
+  };
+
+  const syncPreviewVideo = (filePath) => {
+    if (!previewVideo) return;
+
+    if (!filePath) {
+      previewVideo.pause();
+      previewVideo.removeAttribute('src');
+      previewVideo.load();
+      return;
+    }
+
+    const url = safeToFileUrl(filePath);
+    console.log('[preview] set src =', url);
+
+    previewVideo.pause();
+    previewVideo.currentTime = 0;
+    previewVideo.src = url;
+    previewVideo.load(); // 不自动播放，用户手动点 controls
+  };
+
+  const setVideoPath = (filePath) => {
+    state.videoPath = filePath || '';
+    if (videoPathText) videoPathText.textContent = filePath || '未选择视频';
+    syncPreviewVideo(filePath);
+  };
 
   const validateBeforeRun = () => {
     const videoPath = state.videoPath?.trim() || '';
@@ -14,10 +96,13 @@ window.addEventListener('DOMContentLoaded', () => {
 
     if (!videoPath) return '请先选择视频文件';
     if (!outputPath) return '请先选择输出路径';
-    if (!translationModel) return '请先选择翻译模型';
 
     if (progressMode !== 'ocr' && !whisperModel) {
       return '请先选择 Whisper 模型';
+    }
+
+    if (!translationOnline && !translationModel) {
+      return '请先选择翻译模型，或开启在线翻译';
     }
 
     return '';
@@ -29,12 +114,12 @@ window.addEventListener('DOMContentLoaded', () => {
   const translationBar = $('translationProgressBar');
   const translationText = $('translationProgressText');
   const ocrModeBtn = $('ocrModeBtn');
+  const onlineModeBtn = $('onlineModeBtn');
   const whisperLabel = $('whisperProgressLabel');
   const whisperStep = $('whisperStep');
   const whisperModelInput = $('whisperModel');
   const pickWhisperBtn = $('pickWhisper');
 
-  // max stage progress
   const stageMax = { whisper: 0, translation: 0 };
 
   const syncWhisperModelState = () => {
@@ -52,22 +137,29 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-
   const syncWhisperLabel = () => {
     if (whisperLabel) {
       whisperLabel.textContent =
-      progressMode === 'ocr' ? 'OCR 识别进度' : 'Whisper 识别进度';
+        progressMode === 'ocr' ? 'OCR 识别进度' : 'Whisper 识别进度';
     }
     if (ocrModeBtn) {
       ocrModeBtn.textContent = progressMode === 'ocr' ? 'OCR：开' : 'OCR';
-    } 
+    }
     ocrModeBtn?.classList.toggle('is-on', progressMode === 'ocr');
     if (whisperStep) {
       whisperStep.textContent = progressMode === 'ocr' ? 'OCR 识别' : '语音识别';
     }
   };
+
+  const syncOnlineModeState = () => {
+    if (!onlineModeBtn) return;
+    onlineModeBtn.textContent = translationOnline ? '在线翻译：开' : '在线翻译';
+    onlineModeBtn.classList.toggle('is-on', translationOnline);
+  };
+
   syncWhisperLabel();
   syncWhisperModelState();
+  syncOnlineModeState();
 
   const setRunButtonState = (running) => {
     if (!runBtn) return;
@@ -76,7 +168,6 @@ window.addEventListener('DOMContentLoaded', () => {
   };
 
   const setStageProgress = (stage, p, { allowDecrease = false } = {}) => {
-    // Number(p) || 0 avoid invalid number
     const v = Math.max(0, Math.min(100, Number(p) || 0));
     if (!allowDecrease && (stage === 'whisper' || stage === 'translation')) {
       stageMax[stage] = Math.max(stageMax[stage] || 0, v);
@@ -92,7 +183,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  // running / done / error
   const setStep = (step, status = 'running') => {
     const all = document.querySelectorAll('#stepper .step');
     const order = ['prepare', 'video', 'whisper', 'translation', 'done'];
@@ -133,10 +223,11 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   $('pickVideo')?.addEventListener('click', async () => {
-    const p = await window.api.pickVideo();
-    if (!p) return;
-    state.videoPath = p;
-    $('videoPath').textContent = p;
+    const picked = await window.api.pickVideo();
+    if (!picked) return;
+
+    // picked: { path, url }
+    setVideoPreview(picked.path, picked.url);
   });
 
   $('pickOutput')?.addEventListener('click', async () => {
@@ -153,20 +244,32 @@ window.addEventListener('DOMContentLoaded', () => {
     syncWhisperModelState();
   });
 
-  // drag and drop video file
+  onlineModeBtn?.addEventListener('click', () => {
+    if (isRunning) return;
+    translationOnline = !translationOnline;
+    syncOnlineModeState();
+  });
+
   const dz = $('dropZone');
   dz?.addEventListener('dragover', (e) => {
     e.preventDefault();
     dz.classList.add('dragover');
   });
+
   dz?.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+
   dz?.addEventListener('drop', (e) => {
     e.preventDefault();
     dz.classList.remove('dragover');
+
     const f = e.dataTransfer.files?.[0];
     if (!f) return;
-    state.videoPath = f.path;
-    $('videoPath').textContent = f.path;
+
+    const objectUrl = URL.createObjectURL(f);
+    objectUrlToRevoke = objectUrl;
+
+    // f.path 用于后续 pipeline，objectUrl 只用于前端预览
+    setVideoPreview(f.path || '', objectUrl);
   });
 
   // start processing
@@ -196,6 +299,7 @@ window.addEventListener('DOMContentLoaded', () => {
         translationModel: $('translationModel')?.value?.trim() || '',
         threads: Number($('threads')?.value || 2),
         ocrEnabled: progressMode === 'ocr',
+        onlineTranslation: translationOnline,
       });
 
       if (ret?.code === 0) {
@@ -252,10 +356,4 @@ window.addEventListener('DOMContentLoaded', () => {
       console.error('onCppProgress error:', e);
     }
   });
-
-  // window.api.onCppLog?.((m) => {
-  //   log(`[${m.type}] ${String(m.text || '').trimEnd()}`);
-  // });
-
-  // log('[ready] renderer loaded');
 });

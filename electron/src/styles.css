@@ -389,3 +389,64 @@ button.primary {
   color: #d8ffe9;
   box-shadow: 0 0 0 3px rgba(47, 211, 139, 0.14);
 }
+
+#onlineModeBtn {
+  min-width: 92px;
+  border: 1px solid rgba(125, 147, 214, 0.42);
+  background: linear-gradient(180deg, rgba(34, 45, 84, 0.95), rgba(23, 31, 59, 0.95));
+  color: #cfd9ff;
+  box-shadow: none;
+}
+
+#onlineModeBtn:hover {
+  border-color: rgba(141, 167, 255, 0.75);
+  filter: brightness(1.08);
+}
+
+#onlineModeBtn.is-on {
+  border-color: rgba(47, 211, 139, 0.75);
+  background: linear-gradient(180deg, rgba(47, 211, 139, 0.25), rgba(22, 53, 41, 0.85));
+  color: #d8ffe9;
+  box-shadow: 0 0 0 3px rgba(47, 211, 139, 0.14);
+}
+
+.dropzone {
+  padding: 18px;
+  border: 1px dashed rgba(126, 152, 233, 0.55);
+  background: linear-gradient(180deg, rgba(19, 27, 54, 0.78), rgba(17, 24, 47, 0.72));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.video-preview-wrap {
+  flex: 1;
+  min-height: 180px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(9, 14, 30, 0.55);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview-video {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  background: #000;
+  display: block;
+}
+
+.drop-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.drop-actions .path {
+  margin-top: 0;
+}
