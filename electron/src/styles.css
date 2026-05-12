@@ -134,19 +134,21 @@ button.primary {
 
 .content {
   display: grid;
-  grid-template-rows: 240px 1fr;
-  gap: 16px;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 14px;
   min-height: 0;
+  min-width: 0;
 }
 
 .dropzone {
-  padding: 18px;
+  padding: 14px;
   border: 1px dashed rgba(126, 152, 233, 0.55);
   background: linear-gradient(180deg, rgba(19, 27, 54, 0.78), rgba(17, 24, 47, 0.72));
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 8px;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 10px;
+  min-height: 0;
+  min-width: 0;
 }
 
 .dropzone p {
@@ -420,23 +422,66 @@ button.primary {
   min-height: 0;
 }
 
-.video-preview-wrap {
+/* .video-preview-wrap {
   flex: 1;
-  min-height: 180px;
+  min-height: 0;
+  height: 100%;
   border-radius: 14px;
   border: 1px solid var(--line);
   background: rgba(9, 14, 30, 0.55);
   overflow: hidden;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
+} */
+
+.video-preview-wrap {
+  position: relative;
+}
+
+.video-preview-wrap::after {
+  z-index: 1;
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.8); /* 0.7~0.9 更接近全白 */
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+
+.video-preview-wrap.is-progressing::after {
+  opacity: 1;
+}
+
+.video-progress-overlay {
+  z-index: 2;
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  top: 50%;
+  transform: translateY(-50%);
+  display: none; /* 默认隐藏 */
+  background: rgba(0,0,0,0.45);
+  border-radius: 12px;
+  padding: 10px 12px;
+  backdrop-filter: blur(4px);
+}
+.video-progress-overlay.is-visible {
+  display: block;
+}
+
+.video-progress-text {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #fff;
+  text-align: right;
 }
 
 .preview-video {
   width: 100%;
   height: 100%;
-  max-height: 100%;
-  object-fit: contain;
+  object-fit: contain; /* 若希望无黑边并裁切，请改为 `cover` */
   background: #000;
   display: block;
 }

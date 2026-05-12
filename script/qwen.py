@@ -1,19 +1,22 @@
 import json
 import sys
+import re
 from openai import OpenAI
 
-try:
-    client = OpenAI(
-        # 若没有配置环境变量，请用阿里云百炼API Key将下行替换为: api_key="sk-xxx",
-        api_key=json.load(open(sys.argv[3], "r"))["api_key"],
-        base_url=json.load(open(sys.argv[3], "r"))["base_url"],
-    )
+def iter_batches(entries_list, size):
+    batch = []
+    for entry in entries_list:
+        text = (entry.get("text") or "").strip()
+        if not text:
+            continue
+        batch.append(entry)
+        if len(batch) == size:
+            yield batch
+            batch = []
+    if batch:
+        yield batch
 
-    # 从传入参数读取
-    ocr_path = sys.argv[1]
-    rag_path = sys.argv[2]
-
-    def load_glossary(path):
+def load_glossary(path):
         pairs = []
         with open(path, "r", encoding="utf-8") as f:
             for line in f:
@@ -26,6 +29,17 @@ try:
                 if src and dst:
                     pairs.append((src, dst))
         return pairs
+
+try:
+    client = OpenAI(
+        api_key=json.load(open(sys.argv[3], "r"))["api_key"],
+        base_url=json.load(open(sys.argv[3], "r"))["base_url"],
+    )
+
+    # 从传入参数读取
+    ocr_path = sys.argv[1]
+    rag_path = sys.argv[2]
+    model_name = sys.argv[4] if len(sys.argv) > 4 else "qwen-max"
 
     glossary_pairs = load_glossary(rag_path)
     if glossary_pairs:
@@ -55,18 +69,6 @@ try:
 
     batch_size = 5
 
-    def iter_batches(entries_list, size):
-        batch = []
-        for entry in entries_list:
-            text = (entry.get("text") or "").strip()
-            if not text:
-                continue
-            batch.append(entry)
-            if len(batch) == size:
-                yield batch
-                batch = []
-        if batch:
-            yield batch
     processed = 0
 
     for batch in iter_batches(entries, batch_size):
@@ -92,7 +94,7 @@ try:
         )
 
         completion = client.chat.completions.create(
-            model="qwen-max",
+            model=model_name,
             messages=[
                 {"role": "system", "content": system_prompt + "\n" + terminology_block},
                 {"role": "user", "content": user_prompt},
@@ -100,9 +102,26 @@ try:
         )
 
         # 解析输出：按行切分
-        out_lines = [l.strip() for l in completion.choices[0].message.content.splitlines() if l.strip()]
+        # out_lines = [l.strip() for l in completion.choices[0].message.content.splitlines() if l.strip()]
 
-        # 如果模型输出行数不匹配，建议加入兜底处理
+        raw_lines = completion.choices[0].message.content.splitlines()
+        # 1) 去空行
+        out_lines = [l.strip() for l in raw_lines if l.strip()]
+
+        # 2) 剥离常见编号
+        def strip_leading_number(s):
+            return re.sub(r'^\s*(?:\(?\d+\)?[.\)、]|[-•])\s*', '', s).strip()
+
+        out_lines = [strip_leading_number(l) for l in out_lines]
+
+        # 3) 对齐行数
+        if len(out_lines) != len(pending_entries):
+            print(f"Warning: line count mismatch. expected={len(pending_entries)}, got={len(out_lines)}")
+            if len(out_lines) < len(pending_entries):
+                out_lines += [""] * (len(pending_entries) - len(out_lines))
+            else:
+                out_lines = out_lines[:len(pending_entries)]
+
         for entry, translated in zip(pending_entries, out_lines):
             entry["trans_text"] = translated
             processed += 1

@@ -38,22 +38,6 @@
         <button id="run" class="primary">开始处理</button>
       </div>
 
-    </aside>
-
-    <main class="content">
-      <section id="dropZone" class="card dropzone">
-        <h2>文件输入</h2>
-        <p>拖拽视频到这里，或点击按钮选择</p>
-        <div class="video-preview-wrap">
-          <video id="previewVideo" class="preview-video" controls preload="metadata"></video>
-        </div>
-
-        <div class="drop-actions">
-          <button id="pickVideo">选择视频</button>
-          <div id="videoPath" class="path">未选择视频</div>
-        </div>
-      </section>
-
       <section class="card progress-card">
         <h2>运行进度</h2>
 
@@ -68,7 +52,7 @@
         <!-- <div class="current-step-text">当前步骤：<span id="stepCurrentText">准备</span></div> -->
         <div class="current-step-text">输出结果：<span id="resultPath">-</span></div>
 
-        <div class="progress-group">
+        <!-- <div class="progress-group">
           <div class="progress-head">
             <span id="whisperProgressLabel">Whisper 识别进度</span>
             <span id="whisperProgressText">0%</span>
@@ -86,8 +70,29 @@
           <div class="progress-track">
             <div id="translationProgressBar" class="progress-bar"></div>
           </div>
+        </div> -->
+
+      </section>
+    </aside>
+    <main class="content">
+      <section id="dropZone" class="card dropzone">
+        <h2>文件输入</h2>
+        <p>拖拽视频到这里，或点击按钮选择</p>
+        <div class="video-preview-wrap">
+          <video id="previewVideo" class="preview-video" controls preload="metadata"></video>
+
+          <div class="video-progress-overlay" id="videoProgressOverlay">
+            <div class="progress-track">
+              <div id="videoProgressBar" class="progress-bar"></div>
+            </div>
+            <div class="video-progress-text" id="videoProgressText">0%</div>
+          </div>
         </div>
 
+        <div class="drop-actions">
+          <button id="pickVideo">选择视频</button>
+          <div id="videoPath" class="path">未选择视频</div>
+        </div>
       </section>
     </main>
   </div>

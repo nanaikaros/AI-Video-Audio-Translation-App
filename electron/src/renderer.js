@@ -9,7 +9,30 @@ window.addEventListener('DOMContentLoaded', () => {
 
   const previewVideo = $('previewVideo');
   const videoPathText = $('videoPath');
+  const overlay = $('videoProgressOverlay');
+  const overlayBar = $('videoProgressBar');
+  const overlayText = $('videoProgressText');
+  const videoWrap = document.querySelector('.video-preview-wrap');
+
   let objectUrlToRevoke = '';
+
+  const setOverlayVisible = (visible) => {
+    overlay?.classList.toggle('is-visible', !!visible);
+    videoWrap?.classList.toggle('is-progressing', !!visible);
+  };
+
+  const setOverlayProgress = (p) => {
+    const v = Math.max(0, Math.min(100, Number(p) || 0));
+    if (overlayBar) overlayBar.style.width = `${v}%`;
+    if (overlayText) overlayText.textContent = `${v}%`;
+  };
+
+  // 合成进度：Whisper 50% + Translation 50%
+  const calcOverall = () => {
+    const w = stageMax.whisper || 0;
+    const t = stageMax.translation || 0;
+    return Math.round(w * 0.5 + t * 0.5);
+  };
 
   const cleanupObjectUrl = () => {
     if (objectUrlToRevoke) {
@@ -55,11 +78,15 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   const safeToFileUrl = (filePath) => {
-    // preload 未生效时兜底，避免直接报错
-    if (window.api?.toFileUrl) return window.api.toFileUrl(filePath);
-
-    // fallback: 手工转 file URL
     const normalized = String(filePath || '').replace(/\\/g, '/');
+    try {
+      if (window.api && typeof window.api.toFileUrl === 'function') {
+        const url = window.api.toFileUrl(filePath);
+        if (typeof url === 'string' && url) return url;
+      }
+    } catch (e) {
+      console.warn('window.api.toFileUrl failed:', e);
+    }
     return `file://${encodeURI(normalized)}`;
   };
 
@@ -283,7 +310,8 @@ window.addEventListener('DOMContentLoaded', () => {
 
     isRunning = true;
     setRunButtonState(true);
-
+    setOverlayVisible(true);
+    setOverlayProgress(0);
     // progress reset
     stageMax.whisper = 0;
     stageMax.translation = 0;
@@ -306,6 +334,8 @@ window.addEventListener('DOMContentLoaded', () => {
         setStageProgress('whisper', 100);
         setStageProgress('translation', 100);
         setStep('done', 'done');
+        setOverlayProgress(100); // 成功时可选
+        setOverlayVisible(false);
       } else {
         setStep('done', 'error');
       }
@@ -324,10 +354,23 @@ window.addEventListener('DOMContentLoaded', () => {
       const kind = m.kind || 'progress';
       const stage = m.stage;
       const p = Math.max(0, Math.min(100, Number(m.progress || 0)));
+      let ocrEntity = [];
 
       if (kind === 'output') {
         const el = $('resultPath');
         if (el) el.textContent = m.path || '-';
+        console.log('[onCppProgress] output path:', m.path);
+        if (m.path) {
+          cleanupObjectUrl(); // 如果之前用过 object URL，清理掉
+          console.log('[onCppProgress] preview file URL ->', safeToFileUrl(m.path));
+          setVideoPath(m.path);
+        }
+        return;
+      }
+
+      if(kind === 'ocr_path'){
+        console.log('ocr path:', m.path);
+        ocrEntity = JSON.parse(m.path || '[]');
         return;
       }
 
@@ -337,6 +380,7 @@ window.addEventListener('DOMContentLoaded', () => {
       }
 
       if (kind === 'progress' && stage) {
+        setOverlayProgress(calcOverall());
         if (stage === 'whisper') {
           setStep('whisper', 'running');
           setStageProgress('whisper', p);
@@ -355,5 +399,10 @@ window.addEventListener('DOMContentLoaded', () => {
     } catch (e) {
       console.error('onCppProgress error:', e);
     }
+  });
+
+  previewVideo?.addEventListener('pause', () => {
+    console.log('[preview] video paused at', previewVideo.currentTime);
+    
   });
 });

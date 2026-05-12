@@ -112,9 +112,12 @@ target_link_libraries(my_app PRIVATE
   whisper
   paddle
   glog
+  gflags
   xxhash
   yaml-cpp
   paddle_inference
+  phi
+  phi_core
   common
 )
 

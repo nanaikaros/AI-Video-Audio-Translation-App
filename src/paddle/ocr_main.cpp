@@ -214,13 +214,13 @@ int ocr_start(ai_translation_parmas& atp, output_params& out_params,
   params.text_detection_model_dir = (model_root / "PP-OCRv5_mobile_det_infer").string();
   params.text_recognition_model_dir = (model_root / "korean_PP-OCRv5_mobile_rec_infer").string();
 
-  params.device = "cpu"; // 推理时使用GPU。请确保编译时添加 -DWITH_GPU=ON 选项，否则使用CPU。
+  params.device = "gpu"; // 推理时使用GPU。请确保编译时添加 -DWITH_GPU=ON 选项，否则使用CPU。
   params.use_doc_orientation_classify = false;  // 不使用文档方向分类模型。
   params.use_doc_unwarping = false; // 不使用文本图像矫正模型。
   params.use_textline_orientation = false; // 不使用文本行方向分类模型。
   params.text_detection_model_name = "PP-OCRv5_mobile_det"; // 使用 PP-OCRv5_server_det 模型进行检测。
   params.text_recognition_model_name = "korean_PP-OCRv5_mobile_rec"; // 使用 PP-OCRv5_server_rec 模型进行识别。
-  
+
   auto infer = My_PaddleOCR(params);
 
   if (n <= 0) {
@@ -292,7 +292,7 @@ int ocr_start(ai_translation_parmas& atp, output_params& out_params,
         const int fh = std::max(1, buffer.ocr_frames[j].mat.rows);
 
         // 控制翻译区域
-        if (cy < fh * 0.75) continue; // 只翻译画面下半部份
+        if (cy < fh * 0.3) continue; // 只翻译画面下半部份
         // 控制翻译字体大小
         if(text_area_small(e)) continue;
 

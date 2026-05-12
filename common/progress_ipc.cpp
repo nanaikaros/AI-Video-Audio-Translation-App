@@ -97,14 +97,14 @@ void send_msg(std::string msg){
     #endif
 }
 
-void progress_ipc_send_output(const std::string& path){
+void progress_ipc_send_output(const std::string& path, const std::string& output){
     std::lock_guard<std::mutex> lk(g_mu);
     #if defined(_WIN32)
     if (g_pipe == INVALID_HANDLE_VALUE) return;
     #else
     if (g_fd < 0) return;
     #endif
-    std::string msg = "{\"kind\":\"output\",\"path\":\"" + json_escape(path) + "\"}\n";
+    std::string msg = "{\"kind\":\"" + json_escape(output) + "\",\"path\":\"" + json_escape(path) + "\"}\n";
     send_msg(msg);
 }
 

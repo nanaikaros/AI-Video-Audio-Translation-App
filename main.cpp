@@ -84,41 +84,41 @@ int main(int argc, char ** argv){
     }
 
     // translation
-    // progress_ipc_send_stage("translation", "running");
+    progress_ipc_send_stage("translation", "running");
 
-    // ret = translation_start(atp, buffer);
-    // if (ret != 0) {
-    //     progress_ipc_send_stage("translation", "error");
-    //     return -1; 
-    // }
+    ret = translation_start(atp, buffer);
+    if (ret != 0) {
+        progress_ipc_send_stage("translation", "error");
+        return -1; 
+    }
     
-    // progress_ipc_send_stage("translation", "done");
-    // if(atp.output_video_path.empty()) {
-    //     std::cerr << "video path is empty" << std::endl;
-    //     return -1;
-    // }
+    progress_ipc_send_stage("translation", "done");
+    if(atp.output_video_path.empty()) {
+        std::cerr << "video path is empty" << std::endl;
+        return -1;
+    }
 
-    // std::filesystem::path file(atp.video_path);
-    // std::string fileName = file.filename().stem().string();
+    std::filesystem::path file(atp.video_path);
+    std::string fileName = file.filename().stem().string();
 
-    // // todo: mp4 avi
-    // std::string output_path = atp.output_video_path + "/" + fileName + "_subtitle.mkv";
-    // std::string output_mp4_path = atp.output_video_path + "/" + fileName + "_subtitle.mp4";
+    std::string output_path = atp.output_video_path + "/" + fileName + "_subtitle.mkv";
+    std::string output_mp4_path = atp.output_video_path + "/" + fileName + "_subtitle.mp4";
 
-    // ret = mux_video_with_ass_api(atp.video_path.c_str(), buffer, output_path.c_str());
-    // if (ret != 0) {
-    //     std::cerr << "ass error" << std::endl;
-    //     return -1;
-    // }
+    ret = mux_video_with_ass_api(atp.video_path.c_str(), buffer, output_path.c_str());
+    if (ret != 0) {
+        std::cerr << "ass error" << std::endl;
+        return -1;
+    }
 
-    // // mp4
-    // ret = mkv_to_mp4_with_subtitles(output_path, output_mp4_path);
-    // if (ret != 0) {
-    //     std::cerr << "mp4 error" << std::endl;
-    //     return -1;
-    // }
+    // mp4
+    ret = mkv_to_mp4_with_subtitles(output_path, output_mp4_path);
+    if (ret != 0) {
+        std::cerr << "mp4 error" << std::endl;
+        return -1;
+    }
 
-    // progress_ipc_send_output(output_path);
+    progress_ipc_send_output(build_ocr_cache_path(atp), "ocr_path");
+    progress_ipc_send_output(output_mp4_path, "output");
     progress_ipc_send_stage("done", "done");
     progress_ipc_close();
     return 0;

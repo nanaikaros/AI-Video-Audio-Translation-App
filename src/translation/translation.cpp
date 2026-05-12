@@ -221,6 +221,8 @@ int translation_start(ai_translation_parmas& atp, pipeline_buffer& buffer) {
     if(atp.online_translation){
         // online translation
         online_translation(atp);
+        load_ocr_cache(atp, out_srt);
+        return 0;
     }
 
     if (model_path.empty() || in_srt.empty()) {
