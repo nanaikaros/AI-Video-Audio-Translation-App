@@ -164,6 +164,95 @@ button.primary {
     var(--shadow);
 }
 
+.video-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.subtitle-table {
+  display: grid;
+  grid-auto-rows: minmax(56px, auto);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(9, 14, 30, .45);
+}
+
+.subtitle-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 1px solid var(--line);
+}
+
+.subtitle-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.subtitle-text {
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.subtitle-textarea--trans {
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.subtitle-textarea {
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 10px;
+  line-height: 1.5;
+  border-radius: 8px;
+  border: 1px solid rgba(0,0,0,0.15);
+  resize: vertical;
+  background: #fafafa;
+}
+
+.subtitle-row:last-child {
+  border-bottom: none;
+}
+
+.subtitle-row--head {
+  background: rgba(19, 27, 54, 0.6);
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: .2px;
+}
+
+.subtitle-cell {
+  padding: 8px;
+  border-right: 1px solid var(--line);
+}
+
+.subtitle-cell:last-child {
+  border-right: none;
+}
+
+.subtitle-cell textarea {
+  width: 100%;
+  min-height: 60px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(9, 14, 30, .72);
+  color: var(--text);
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.subtitle-row.is-active {
+  outline: 2px solid rgba(111, 140, 255, 0.7);
+  box-shadow: 0 0 0 3px rgba(111, 140, 255, 0.18);
+}
+
 .path {
   margin-top: 6px;
   padding: 10px 12px;
@@ -366,6 +455,29 @@ button.primary {
   .content {
     grid-template-rows: 220px 1fr;
   }
+  .media-grid {
+    grid-template-columns: 1fr;
+  }
+  .subtitle-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.media-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 420px);
+  gap: 14px;
+  min-height: 0;
+  align-items: start;
+}
+
+
+.subtitle-panel {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(9, 14, 30, .55);
+  min-height: 0;
 }
 
 .is-hidden {
