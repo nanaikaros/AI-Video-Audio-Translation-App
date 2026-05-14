@@ -13,7 +13,6 @@ if(MSVC)
     set(${var} "${${var}}" CACHE STRING "" FORCE)
   endforeach()
 
-  # 保险起见，全局添加编译选项（按配置）
   add_compile_options(
     "$<$<CONFIG:Debug>:/MTd>"
     "$<$<CONFIG:Release>:/MT>"

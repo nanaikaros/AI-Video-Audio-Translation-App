@@ -11,4 +11,6 @@ contextBridge.exposeInMainWorld('api', {
   runCppPipeline: (payload) => ipcRenderer.invoke('run-cpp-pipeline', payload),
   logFront: (level, msg) => ipcRenderer.send('frontend-log', { level, msg }),
   toFileUrl: (filePath) => (filePath ? pathToFileURL(filePath).href : ''),
+  readTextFile: (filePath) => ipcRenderer.invoke('read-text-file', filePath),
+  writeTextFile: (filePath, text) => ipcRenderer.invoke('write-text-file', filePath, text),
 });

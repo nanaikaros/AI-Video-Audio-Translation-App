@@ -64,9 +64,14 @@ ipcMain.handle('pick-video', async () => {
   if (ret.canceled || ret.filePaths.length === 0) return null;
 
   const filePath = ret.filePaths[0];
+  let fileName = path.basename(filePath); // 获取文件名（带后缀）
+  fileName = path.parse(fileName).name;
+  const ocrResultPath = `${path.dirname(filePath)}/.temp/${fileName}/ocr.json`;
+  console.log('[pick-video] picked file:', filePath, 'ocrResultPath:', ocrResultPath);
   return {
     path: filePath,
     url: pathToFileURL(filePath).href,
+    ocrResults: ocrResultPath
   };
 });
 
@@ -85,6 +90,17 @@ ipcMain.handle('pick-dir', async () => {
   });
   if (ret.canceled || ret.filePaths.length === 0) return null;
   return ret.filePaths[0];
+});
+
+ipcMain.handle('read-text-file', async (_e, filePath) => {
+  if (!filePath) return '';
+  return fs.promises.readFile(filePath, 'utf8');
+});
+
+ipcMain.handle('write-text-file', async (_e, filePath, text) => {
+  if (!filePath) throw new Error('missing file path');
+  await fs.promises.writeFile(filePath, text ?? '', 'utf8');
+  return true;
 });
 
 function getBackendBin() {
@@ -153,8 +169,8 @@ ipcMain.handle('run-cpp-pipeline', async (event, payload) => {
   const emitProgress = (stage, progress) => {
     event.sender.send('cpp-progress', { kind: 'progress', stage, progress: Number(progress) || 0 });
   };
-  const emitOutput = (p) => {
-    event.sender.send('cpp-progress', { kind: 'output', path: p });
+  const emitOutput = (p, kind = 'output') => {
+    event.sender.send('cpp-progress', { kind, path: p });
   };
 
   const safeResolve = (ret) => {
@@ -182,8 +198,10 @@ ipcMain.handle('run-cpp-pipeline', async (event, payload) => {
         try {
           const msg = JSON.parse(s);
           gotAnyProgress = true;
-          if (msg.path) emitOutput(msg.path);
-
+          if (msg.kind === 'output' || msg.kind === 'ocr_path') {
+            if (msg.path) emitOutput(msg.path, msg.kind);
+          }
+          
           if (msg.stage === 'video') {
             emitStage('video', 'running');
           } else if (msg.stage === 'whisper') {

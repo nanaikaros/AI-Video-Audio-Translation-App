@@ -149,6 +149,9 @@ window.addEventListener('DOMContentLoaded', () => {
 
   const stageMax = { whisper: 0, translation: 0 };
 
+  let ocrEntity = [];
+  let ocrFilePath = '';
+
   const syncWhisperModelState = () => {
     const disableWhisper = progressMode === 'ocr';
 
@@ -252,8 +255,17 @@ window.addEventListener('DOMContentLoaded', () => {
   $('pickVideo')?.addEventListener('click', async () => {
     const picked = await window.api.pickVideo();
     if (!picked) return;
-
+    console.log('ocr results loaded from picked.ocrResults path:', picked.ocrResults);
     // picked: { path, url }
+    // 判断一下这个视频是否已经有ocr结果了，如果有的话直接加载预览和字幕
+    if (picked.ocrResults) {
+      const text = await window.api.readTextFile(picked.ocrResults);
+      const parsed = JSON.parse(text || '{}');
+      ocrFilePath = picked.ocrResults;
+      ocrEntity = Array.isArray(parsed.entries) ? parsed.entries : [];
+    } else {
+      ocrEntity = [];
+    }
     setVideoPreview(picked.path, picked.url);
   });
 
@@ -347,14 +359,60 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  window.api.onCppProgress?.((m) => {
+  // 渲染字幕行（使用 .subtitle-list 容器）
+  const renderSubtitleList = (list) => {
+    const container = document.querySelector('.subtitle-list');
+    if (!container) return;
+
+    container.innerHTML = '';
+    list.forEach((item, i) => {
+      const row = document.createElement('div');
+      row.className = 'subtitle-row';
+      row.dataset.index = String(i);
+
+      row.innerHTML = `
+        <div class="subtitle-col">
+          <textarea class="subtitle-textarea" placeholder="原字幕">${ocrEntity[item]?.text || ''}</textarea>
+        </div>
+        <div class="subtitle-col">
+          <textarea class="subtitle-textarea subtitle-textarea--trans" placeholder="翻译字幕">${ocrEntity[item]?.trans_text || ''}</textarea>
+        </div>
+      `;
+      row.querySelector('.subtitle-textarea')?.addEventListener('input', (e) => {
+        ocrEntity[item].text = e.target.value;
+      });
+
+      row.querySelector('.subtitle-textarea--trans')?.addEventListener('input', (e) => {
+        ocrEntity[item].trans_text = e.target.value;
+      });
+      container.appendChild(row);
+    });
+  };
+
+  const saveBtn = $('saveSubtitles');
+  saveBtn?.addEventListener('click', async () => {
+    if (!ocrFilePath) {
+      alert('没有 OCR 文件路径，无法保存');
+      return;
+    }
+    try {
+      const payload = JSON.stringify({ entries: ocrEntity }, null, 2);
+
+      await window.api.writeTextFile(ocrFilePath, payload);
+      console.log('保存成功');
+    } catch (e) {
+      console.error('save failed:', e);
+      alert('保存失败');
+    }
+  });
+
+  window.api.onCppProgress?.(async (m) => {
     try {
       if (!m) return;
 
       const kind = m.kind || 'progress';
       const stage = m.stage;
       const p = Math.max(0, Math.min(100, Number(m.progress || 0)));
-      let ocrEntity = [];
 
       if (kind === 'output') {
         const el = $('resultPath');
@@ -368,9 +426,15 @@ window.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      if(kind === 'ocr_path'){
-        console.log('ocr path:', m.path);
-        ocrEntity = JSON.parse(m.path || '[]');
+      if (kind === 'ocr_path') {
+        try {
+          const text = await window.api.readTextFile(m.path);
+          const parsed = JSON.parse(text || '{}');
+          ocrEntity = Array.isArray(parsed.entries) ? parsed.entries : [];
+          console.log('ocr nums:', ocrEntity.length)
+        } catch (e) {
+          console.error('load ocr json failed:', e);
+        }
         return;
       }
 
@@ -401,8 +465,41 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  const highlightSubtitleRows = (indices) => {
+    const rows = document.querySelectorAll('.subtitle-row');
+    rows.forEach((r) => r.classList.remove('is-active'));
+
+    indices.forEach((i, n) => {
+      const target = rows[i];
+      if (target) {
+        target.classList.add('is-active');
+        if (n === 0) target.scrollIntoView({ block: 'nearest' });
+      }
+    });
+  };
+
+  const findSubtitleIndicesByRange = (tCs) => {
+    const result = [];
+    ocrEntity.forEach((item, i) => {
+      const t0 = Number(item.t0_cs ?? 0);
+      const t1 = Number(item.t1_cs ?? t0);
+      // console.log(`[findSubtitleIndicesByRange] check idx=${i}, t0=${t0}, t1=${t1}, tCs=${tCs}`);
+      if (tCs >= t0 && tCs <= t1) result.push(i);
+    });
+    return result;
+  };
+
+
   previewVideo?.addEventListener('pause', () => {
     console.log('[preview] video paused at', previewVideo.currentTime);
-    
+    const tCs = Math.round(previewVideo.currentTime * 100);
+    const indices = findSubtitleIndicesByRange(tCs);
+    console.log('[preview] subtitle indices text ans trans_text for current time:', indices.map((i) => ({
+      index: i,
+      text: ocrEntity[i]?.text,
+      trans_text: ocrEntity[i]?.trans_text
+    })));
+    renderSubtitleList(indices);
+    highlightSubtitleRows(indices);
   });
 });
